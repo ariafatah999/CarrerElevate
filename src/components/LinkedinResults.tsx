@@ -28,7 +28,7 @@ interface LinkedinResultsProps {
   linkedinTone: string;
 }
 
-type ActiveSection = "headline" | "about" | "experience" | "education" | "skills" | "certifications" | "projects";
+type ActiveSection = "headline" | "about" | "experience" | "education" | "skills" | "certifications" | "projects" | "achievements";
 
 export default function LinkedinResults({
   activeAnalysis,
@@ -83,6 +83,11 @@ export default function LinkedinResults({
         return [
           "Showcase proyek nyata yang menunjukkan penguasaan teknologi Anda.",
           "Sebutkan kontribusi krusial Anda dan tech-stack yang dipakai di proyek bersangkutan."
+        ];
+      case "achievements":
+        return [
+          "Tulis prestasi Anda dengan menyisipkan angka keberhasilan konkret jika ada.",
+          "Gunakan penulisan formal dan sebutkan tingkat persaingan demi menaikkan kredibilitas."
         ];
     }
   };
@@ -243,6 +248,18 @@ export default function LinkedinResults({
         >
           <FileText className="w-3.5 h-3.5" />
           <span>Projects</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection("achievements")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTabSection === "achievements" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <Award className="w-3.5 h-3.5 text-amber-400" />
+          <span>Achievements</span>
         </button>
       </div>
 
@@ -408,6 +425,26 @@ export default function LinkedinResults({
                       <span key={idx} className="text-[10px] bg-[#030712] text-zinc-300 border border-white/[0.04] px-2.5 py-1.5 rounded font-mono font-medium flex items-center gap-1.5">
                         <FileText className="w-3 h-3 text-cyan-400" />
                         {proj}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Achievements Left */}
+            {activeTabSection === "achievements" && (
+              <div className="space-y-4 animate-fade-in text-zinc-300">
+                {parsedLinkedinResult.achievements && parsedLinkedinResult.achievements.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {parsedLinkedinResult.achievements.map((ach, idx) => (
+                      <span key={idx} className="text-[10px] bg-[#030712] text-zinc-300 border border-white/[0.04] px-2.5 py-1.5 rounded font-mono font-medium flex items-center gap-1.5">
+                        <Award className="w-3 h-3 text-amber-500" />
+                        {ach}
                       </span>
                     ))}
                   </div>
@@ -592,7 +629,21 @@ export default function LinkedinResults({
             {/* Skills Right Section */}
             {activeTabSection === "skills" && (
               <div className="space-y-4 animate-fade-in text-zinc-100">
-                {parsedLinkedinResult.skills && parsedLinkedinResult.skills.length > 0 ? (
+                {opt?.skills_recommendations && opt.skills_recommendations.length > 0 && opt.skills_recommendations[0] !== "Data belum terdeteksi dari input." ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Rekomendasi kata kunci optimasi & pengelompokkan skill LinkedIn hasil analisis:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {opt.skills_recommendations.map((skText, idx) => (
+                        <span key={idx} className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-[#10B981] px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                          {skText}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : parsedLinkedinResult.skills && parsedLinkedinResult.skills.length > 0 ? (
                   <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
                     <p className="text-[10px] font-mono text-zinc-400 leading-normal">
                       Rekomendasi kata kunci optimasi & pengelompokkan skill LinkedIn yang selaras untuk meningkatkan pencocokan filter rekruter pada peran target <strong className="text-emerald-400">{linkedinTargetRole}</strong>:
@@ -617,7 +668,21 @@ export default function LinkedinResults({
             {/* Certifications Right Section */}
             {activeTabSection === "certifications" && (
               <div className="space-y-4 animate-fade-in text-zinc-100">
-                {parsedLinkedinResult.certifications && parsedLinkedinResult.certifications.length > 0 ? (
+                {opt?.certifications_recommendations && opt.certifications_recommendations.length > 0 && opt.certifications_recommendations[0] !== "Data belum terdeteksi dari input." ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Rekomendasi penulisan sertifikasi pihak ketiga untuk profil LinkedIn Anda:
+                    </p>
+                    <div className="space-y-2">
+                      {opt.certifications_recommendations.map((cert, idx) => (
+                        <div key={idx} className="p-2.5 bg-zinc-900 border border-white/[0.02] rounded text-xs font-mono text-zinc-200 flex items-start gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <span>{cert}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : parsedLinkedinResult.certifications && parsedLinkedinResult.certifications.length > 0 ? (
                   <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
                     <p className="text-[10px] font-mono text-[#10B981] font-semibold leading-normal flex items-center gap-1.5 uppercase tracking-wide">
                       <Check className="w-3.5 h-3.5" /> Sertifikasi Anda Terasosiasi Sukses!
@@ -642,7 +707,29 @@ export default function LinkedinResults({
             {/* Projects Right Section */}
             {activeTabSection === "projects" && (
               <div className="space-y-4 animate-fade-in text-zinc-100">
-                {parsedLinkedinResult.projects && parsedLinkedinResult.projects.length > 0 ? (
+                {opt?.projects_recommendations && opt.projects_recommendations.length > 0 && opt.projects_recommendations[0] !== "Data belum terdeteksi dari input." ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Rincian formula penulisan portofolio proyek terstruktur untuk LinkedIn:
+                    </p>
+                    <div className="space-y-2">
+                      {opt.projects_recommendations.map((proj, idx) => (
+                        <div key={idx} className="p-2.5 bg-[#030712] border border-white/[0.04] rounded text-xs font-mono text-zinc-200 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-emerald-400 uppercase font-bold font-mono">Draf Optimasi Proyek {idx + 1}</span>
+                            <button
+                              onClick={() => copyToClipboard(proj, `proj_copy_${idx}`)}
+                              className="bg-white hover:bg-zinc-200 text-[#030712] px-2 py-0.5 rounded text-[8px] font-mono font-bold cursor-pointer transition-all shrink-0"
+                            >
+                              {copiedText === `proj_copy_${idx}` ? "Disalin" : "Salin"}
+                            </button>
+                          </div>
+                          <p className="text-zinc-200 leading-relaxed">"{proj}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : parsedLinkedinResult.projects && parsedLinkedinResult.projects.length > 0 ? (
                   <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
                     <p className="text-[10px] font-mono text-zinc-400 leading-normal">
                       Rekomendasi taktik memajang proyek portofolio Anda di bagian Project LinkedIn agar menarik rekruter:
@@ -654,6 +741,53 @@ export default function LinkedinResults({
                             • <strong className="text-emerald-400">{proj}</strong>: Jabarkan tech stack dan tunjukkan link fungsional/GitHub live.
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="p-4 bg-[#030712] text-xs text-zinc-550 italic font-mono rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Achievements Right Section */}
+            {activeTabSection === "achievements" && (
+              <div className="space-y-4 animate-fade-in text-zinc-100">
+                {opt?.achievements_recommendations && opt.achievements_recommendations.length > 0 && opt.achievements_recommendations[0] !== "Data belum terdeteksi dari input." ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Usulan penulisan prestasi & penghargaan karir terukur di LinkedIn:
+                    </p>
+                    <div className="space-y-2">
+                      {opt.achievements_recommendations.map((ach, idx) => (
+                        <div key={idx} className="p-2.5 bg-[#030712] border border-white/[0.04] rounded text-xs font-mono text-zinc-200 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[9px] text-emerald-400 uppercase font-bold font-mono">Draf Optimasi Prestasi {idx + 1}</span>
+                            <button
+                              onClick={() => copyToClipboard(ach, `ach_copy_${idx}`)}
+                              className="bg-white hover:bg-zinc-200 text-[#030712] px-2 py-0.5 rounded text-[8px] font-mono font-bold cursor-pointer transition-all shrink-0"
+                            >
+                              {copiedText === `ach_copy_${idx}` ? "Disalin" : "Salin"}
+                            </button>
+                          </div>
+                          <p className="text-zinc-200 leading-relaxed">"{ach}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : parsedLinkedinResult.achievements && parsedLinkedinResult.achievements.length > 0 ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Daftar prestasi terdeteksi yang siap disalin ke bagian Honors &amp; Awards LinkedIn Anda:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 font-mono">
+                      {parsedLinkedinResult.achievements.map((ach, idx) => (
+                        <span key={idx} className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/15 px-2.5 py-1.5 rounded font-mono font-semibold flex items-center gap-1.5">
+                          <CheckCircle className="w-3 h-3 text-emerald-450" />
+                          {ach}
+                        </span>
                       ))}
                     </div>
                   </div>

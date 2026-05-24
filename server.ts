@@ -348,6 +348,10 @@ Sila lakukan parsing, deteksi fallback pendidikan, serta validasi data.`;
               items: { type: Type.STRING },
               description: "Daftar email, nomor telepon, portfolio, github atau linkedin yang tertera di teks CV."
             },
+            summary: {
+              type: Type.STRING,
+              description: "Profil ringkas, deskripsi diri, atau executive summary / professional summary yang tercantum di awal CV. Jika tidak ada sama sekali, buatlah 2-3 kalimat ringkasan profesional yang sangat akurat merepresentasikan seluruh isi CV secara ringkas."
+            },
             education: {
               type: Type.ARRAY,
               items: {
@@ -422,6 +426,7 @@ Sila lakukan parsing, deteksi fallback pendidikan, serta validasi data.`;
           required: [
             "candidate_name",
             "candidate_socials",
+            "summary",
             "education",
             "experience",
             "skills",
@@ -549,9 +554,65 @@ Tolong buat kalkulasi ATS Score yang jujur, analisis keyword gapped, ulasan rewr
                     },
                     required: ["section", "main_issue", "before", "after", "reason"]
                   }
+                },
+                recommendations: {
+                  type: Type.OBJECT,
+                  properties: {
+                    summary: {
+                      type: Type.STRING,
+                      description: "Hasil re-write ringkasan profil karir profesional secara dinamis berasas murni pada kualifikasi riil parsedData."
+                    },
+                    education: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          institution: { type: Type.STRING },
+                          degree: { type: Type.STRING },
+                          major: { type: Type.STRING },
+                          period: { type: Type.STRING },
+                          gpa: { type: Type.STRING },
+                          activities: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Revisi kegiatan akademik berbasis kompetensi target." }
+                        },
+                        required: ["institution", "major"]
+                      },
+                      description: "Array edukasi yang ditulis ulang secara lebih terarah, dengan urutan dan ukuran index SAMA PERSIS dengan input parsedData.education."
+                    },
+                    experience: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          company: { type: Type.STRING },
+                          role: { type: Type.STRING },
+                          period: { type: Type.STRING },
+                          tools: { type: Type.ARRAY, items: { type: Type.STRING } },
+                          highlights: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Deskripsi tanggung jawab yang dipoles dengan XYZ formula." }
+                        },
+                        required: ["company", "role"]
+                      },
+                      description: "Array riwayat kerja yang dipoles menggunakan XYZ formula tingkat tinggi, dengan urutan dan ukuran index SAMA PERSIS dengan input parsedData.experience."
+                    },
+                    skills: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "Kumpulan list skills yang dikelompokkan/diselaraskan lebih rapi untuk target loker."
+                    },
+                    projects: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "Array draf/deskripsi proyek yang dipoles lebih tajam dan profesional, dengan urutan dan ukuran index SAMA PERSIS dengan input parsedData.projects."
+                    },
+                    certifications: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                      description: "Array sertifikat yang diselaraskan penulisannya, dengan urutan dan ukuran index SAMA PERSIS dengan input parsedData.certifications."
+                    }
+                  },
+                  required: ["summary", "education", "experience", "skills", "projects", "certifications"]
                 }
               },
-              required: ["ats_score", "candidate_name", "candidate_socials", "target_optimizations", "keyword_gap", "improvements"]
+              required: ["ats_score", "candidate_name", "candidate_socials", "target_optimizations", "keyword_gap", "improvements", "recommendations"]
             },
             linkedin_optimization: {
               type: Type.OBJECT,
@@ -582,6 +643,26 @@ Tolong buat kalkulasi ATS Score yang jujur, analisis keyword gapped, ulasan rewr
                   type: Type.ARRAY,
                   items: { type: Type.STRING },
                   description: "Usulan penulisan pendidikan di LinkedIn."
+                },
+                skills_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Unggulan rumpun keahlian utama untuk ditonjolkan sesuai dengan data asli."
+                },
+                certifications_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Lisensi sertifikasi resmi untuk meningkatkan SEO filter rekruter."
+                },
+                projects_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Rincian penulisan portofolio proyek terstruktur."
+                },
+                achievements_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Pemolesan draf prestasi karir terukur milik pengguna."
                 }
               },
               required: ["headline_recommendations", "summary_before_snippet", "summary_after", "summary_improvement_notes", "experience_recommendations", "education_recommendations"]
@@ -597,7 +678,107 @@ Tolong buat kalkulasi ATS Score yang jujur, analisis keyword gapped, ulasan rewr
       throw new Error("Received empty response from Optimizer AI.");
     }
 
-    res.json(JSON.parse(resultText));
+    const aiParsed = JSON.parse(resultText);
+
+    // Build the exact, synchronized RecommendationResult structure
+    const original = parsedData;
+    const aiRecommendations = aiParsed.cv_analysis?.recommendations || aiParsed.recommendations || {};
+
+    // 1. Summary
+    const summaryRec = {
+      original: original.summary || "Data belum tersedia",
+      optimized: aiRecommendations.summary || original.summary || "Data belum tersedia"
+    };
+
+    // 2. Education (1-to-1 matching)
+    const educationRec = (original.education || []).map((edu: any, idx: number) => {
+      const aiEdu = aiRecommendations.education?.[idx] || {};
+      return {
+        original: {
+          institution: edu.institution || "Data belum tersedia",
+          degree: edu.degree || "",
+          major: edu.major || "Data belum tersedia",
+          period: edu.period || "",
+          gpa: edu.gpa || "",
+          activities: edu.activities || []
+        },
+        optimized: {
+          institution: edu.institution || "Data belum tersedia", // STRICT: lock the original name!
+          degree: aiEdu.degree || edu.degree || "",
+          major: aiEdu.major || edu.major || "",
+          period: edu.period || aiEdu.period || "",
+          gpa: edu.gpa || aiEdu.gpa || "",
+          activities: aiEdu.activities && aiEdu.activities.length > 0 ? aiEdu.activities : (edu.activities || [])
+        }
+      };
+    });
+
+    // 3. Experience (1-to-1 matching)
+    const experienceRec = (original.experience || []).map((exp: any, idx: number) => {
+      const aiExp = aiRecommendations.experience?.[idx] || {};
+      return {
+        original: {
+          company: exp.company || "Data belum tersedia",
+          role: exp.role || "Data belum tersedia",
+          period: exp.period || "",
+          tools: exp.tools || [],
+          highlights: exp.highlights || []
+        },
+        optimized: {
+          company: exp.company || "Data belum tersedia", // STRICT: lock the original name!
+          role: aiExp.role || exp.role || "",
+          period: exp.period || aiExp.period || "",
+          tools: aiExp.tools || exp.tools || [],
+          highlights: aiExp.highlights && aiExp.highlights.length > 0 ? aiExp.highlights : (exp.highlights || [])
+        }
+      };
+    });
+
+    // 4. Skills
+    const skillsRec = {
+      original: original.skills || [],
+      optimized: aiRecommendations.skills || original.skills || []
+    };
+
+    // 5. Projects (1-to-1 matching)
+    const projectsRec = (original.projects || []).map((proj: string, idx: number) => {
+      const aiProj = aiRecommendations.projects?.[idx] || "";
+      const optVal = (typeof aiProj === "object" && aiProj !== null) ? ((aiProj as any).optimized || (aiProj as any).after || proj) : aiProj;
+      return {
+        original: proj,
+        optimized: optVal || proj
+      };
+    });
+
+    // 6. Certifications (1-to-1 matching)
+    const certificationsRec = (original.certifications || []).map((cert: string, idx: number) => {
+      const aiCert = aiRecommendations.certifications?.[idx] || "";
+      const optVal = (typeof aiCert === "object" && aiCert !== null) ? ((aiCert as any).optimized || (aiCert as any).after || cert) : aiCert;
+      return {
+        original: cert,
+        optimized: optVal || cert
+      };
+    });
+
+    // Construct final recommendationResult
+    const recommendationResult = {
+      summary: summaryRec,
+      education: educationRec,
+      experience: experienceRec,
+      skills: skillsRec,
+      projects: projectsRec,
+      certifications: certificationsRec
+    };
+
+    if (!aiParsed.cv_analysis) {
+      aiParsed.cv_analysis = {};
+    }
+    aiParsed.cv_analysis.recommendations = recommendationResult;
+
+    // Put original parsed_data securely into cv_analysis if not present
+    aiParsed.cv_analysis.parsed_data = original;
+
+    res.json(aiParsed);
   } catch (error: any) {
     console.error("Optimize CV route error:", error);
     res.status(500).json({ error: error.message || "Gagal menjalankan optimasi data CV setia fakta." });
@@ -797,6 +978,26 @@ Silakan formulasikan rekomendasi headline (3 opsi CTR tinggi), ringkasan About M
               type: Type.ARRAY,
               items: { type: Type.STRING },
               description: "Rekomendasi penulisan seksi Pendidikan di LinkedIn. Jika kosong pada data aslinya, kembalikan hanya ['Data belum terdeteksi dari input.']"
+            },
+            skills_recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Rekomendasi pengelompokkan skill dengan padat kata kunci SEO LinkedIn berdasarkan skills asli penguna."
+            },
+            certifications_recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Rekomendasi penulisan bagian lisensi/sertifikasi LinkedIn bersandar fakta asli pengguna."
+            },
+            projects_recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Optimasi penulisan portofolio proyek LinkedIn bersandar fakta asli pengguna."
+            },
+            achievements_recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Optimasi penulisan prestasi di LinkedIn bersandar fakta asli pengguna."
             }
           },
           required: [

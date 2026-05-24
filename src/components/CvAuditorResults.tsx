@@ -24,7 +24,7 @@ interface CvAuditorResultsProps {
   jobDescription?: string;
 }
 
-type CvTabSection = "experience" | "education" | "skills" | "summary";
+type CvTabSection = "summary" | "experience" | "education" | "skills" | "projects" | "certifications";
 
 export default function CvAuditorResults({
   activeAnalysis,
@@ -39,32 +39,64 @@ export default function CvAuditorResults({
   const cv = activeAnalysis.cv_analysis;
   const improvements = cv.improvements || [];
 
-  const [activeTabSection, setActiveTabSection] = useState<CvTabSection>("experience");
+  const [activeTabSection, setActiveTabSection] = useState<CvTabSection>("summary");
 
-  // Filter improvements based on actual sections cleanly
-  const expImps = improvements.filter(imp => {
-    const s = (imp.section || "").toLowerCase();
-    return s.includes("kerja") || s.includes("experience") || s.includes("work") || s.includes("proyek") || s.includes("project") || s.includes("pengalaman") || s.includes("jabatan") || s.includes("karir") || s.includes("intern");
-  });
+  // Fallback and unified recommendation result structure (Robust backwards-compatibility)
+  const parsedData = cv.parsed_data || {
+    summary: "",
+    skills: [],
+    experience: [],
+    education: [],
+    projects: [],
+    certifications: []
+  };
 
-  const eduImps = improvements.filter(imp => {
-    const s = (imp.section || "").toLowerCase();
-    return s.includes("pendidikan") || s.includes("education") || s.includes("akad") || s.includes("kuliah") || s.includes("sekolah") || s.includes("universitas") || s.includes("grade") || s.includes("ipk") || s.includes("gpa");
-  });
-
-  const skillsImps = improvements.filter(imp => {
-    const s = (imp.section || "").toLowerCase();
-    return s.includes("skill") || s.includes("keahlian") || s.includes("teknologi") || s.includes("tools") || s.includes("bahasa") || s.includes("programming");
-  });
-
-  const summaryImps = improvements.filter(imp => {
-    const s = (imp.section || "").toLowerCase();
-    return s.includes("summary") || s.includes("profile") || s.includes("ringkasan") || s.includes("tentang") || s.includes("about") || s.includes("diri") || s.includes("objektif") || s.includes("eksekutif") || s.includes("headline");
-  });
+  const recs = cv.recommendations || {
+    summary: {
+      original: parsedData.summary || "Data belum tersedia",
+      optimized: improvements.find(i => (i.section || "").toLowerCase().includes("summary"))?.after || parsedData.summary || "Data belum tersedia"
+    },
+    education: (parsedData.education || []).map((edu) => ({
+      original: edu,
+      optimized: {
+        ...edu,
+        activities: improvements.find(i => (i.section || "").toLowerCase().includes("education"))?.after 
+          ? [improvements.find(i => (i.section || "").toLowerCase().includes("education"))!.after]
+          : edu.activities || []
+      }
+    })),
+    experience: (parsedData.experience || []).map((exp) => ({
+      original: exp,
+      optimized: {
+        ...exp,
+        highlights: improvements.find(i => (i.section || "").toLowerCase().includes("experience"))?.after
+          ? [improvements.find(i => (i.section || "").toLowerCase().includes("experience"))!.after]
+          : exp.highlights || []
+      }
+    })),
+    skills: {
+      original: parsedData.skills || [],
+      optimized: improvements.find(i => (i.section || "").toLowerCase().includes("skill"))?.after?.split(",").map(s => s.trim()) || parsedData.skills || []
+    },
+    projects: (parsedData.projects || []).map(proj => ({
+      original: proj,
+      optimized: proj
+    })),
+    certifications: (parsedData.certifications || []).map(cert => ({
+      original: cert,
+      optimized: cert
+    }))
+  };
 
   // Simple, short recommendations based on tab type
   const getTabRecommendations = (): string[] => {
     switch (activeTabSection) {
+      case "summary":
+        return [
+          "Buat ringkasan yang singkat, padat, dan langsung menjelaskan keahlian teknis andalan Anda.",
+          "Sematkan langsung kaitan antara nilai keahlian utama Anda dengan solusi di perusahaan target.",
+          "Hindari kalimat deskriptif umum berlebih seperti 'pekerja keras' atau 'berdedikasi tinggi'."
+        ];
       case "experience":
         return [
           "Tambahkan tools dan teknologi yang digunakan secara spesifik untuk setiap pekerjaan.",
@@ -84,11 +116,17 @@ export default function CvAuditorResults({
           "Tuliskan nama tools/bahasa pemrograman yang baku dan konsisten (e.g. React.js, TypeScript).",
           "Hanya tampilkan keahlian yang terverifikasi dan benar-benar Anda kuasai."
         ];
-      case "summary":
+      case "projects":
         return [
-          "Buat ringkasan yang singkat, padat, dan langsung menjelaskan keahlian teknis andalan Anda.",
-          "Sematkan langsung kaitan antara nilai keahlian utama Anda dengan solusi di perusahaan target.",
-          "Hindari kalimat deskriptif umum berlebih seperti 'pekerja keras' atau 'berdedikasi tinggi'."
+          "Tulis rincian kontribusi spesifik Anda dalam tim atau arsitektur utama proyek.",
+          "Sebutkan tautan repositori kode atau deployment aktif jika ada untuk verifikasi.",
+          "Tampilkan proyek-proyek yang paling relevan dengan target lowongan pekerjaan."
+        ];
+      case "certifications":
+        return [
+          "Urutkan sertifikasi mulai dari yang memiliki masa berlaku aktif terlama.",
+          "Cantumkan penerbit resmi sertifikat (seperti Google, Microsoft, AWS, dsb).",
+          "Hindari mencantumkan sertifikat lama yang keterampilannya sudah usang."
         ];
     }
   };
@@ -314,6 +352,18 @@ export default function CvAuditorResults({
       {/* 3. COHESIVE TAB NAVIGATION */}
       <div className="bg-[#090d16] p-1.5 rounded-xl border border-white/[0.04] flex flex-wrap gap-1">
         <button
+          onClick={() => setActiveTabSection("summary")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTabSection === "summary" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>Summary</span>
+        </button>
+
+        <button
           onClick={() => setActiveTabSection("experience")}
           className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
             activeTabSection === "experience" 
@@ -350,15 +400,27 @@ export default function CvAuditorResults({
         </button>
 
         <button
-          onClick={() => setActiveTabSection("summary")}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTabSection === "summary" 
+          onClick={() => setActiveTabSection("projects")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeTabSection === "projects" 
               ? "bg-white/[0.04] border border-white/[0.08] text-white" 
               : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" />
-          <span>Summary</span>
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Projects</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection("certifications")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            activeTabSection === "certifications" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <CheckCircle className="w-3.5 h-3.5" />
+          <span>Certifications</span>
         </button>
       </div>
 
@@ -374,26 +436,42 @@ export default function CvAuditorResults({
                 CURRENT DATA (CV ASLI)
               </span>
             </div>
-            <span className="text-[9px] bg-amber-500/10 text-amber-450 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase text-amber-400">
+            <span className="text-[9px] bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase text-amber-400">
               Original Draft
             </span>
           </div>
 
-          <div className="min-h-[220px]">
+          <div className="min-h-[220px] space-y-4">
+            {/* Summary Left */}
+            {activeTabSection === "summary" && (
+              <div className="p-4.5 bg-[#030712] rounded-xl border border-white/[0.03] text-zinc-350 leading-relaxed font-sans text-xs whitespace-pre-wrap">
+                {recs.summary.original}
+              </div>
+            )}
+
             {/* Experience Left */}
             {activeTabSection === "experience" && (
-              <div className="space-y-3 animate-fade-in text-zinc-300">
-                {expImps.length > 0 ? (
-                  expImps.map((imp, idx) => (
-                    <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                      {imp.section && (
-                        <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono font-extrabold uppercase block w-max mb-1">
-                          {imp.section}
-                        </span>
+              <div className="space-y-3">
+                {recs.experience.length > 0 ? (
+                  recs.experience.map((item, idx) => (
+                    <div key={idx} className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
+                        <h5 className="text-xs font-bold text-white font-sans">{item.original.role || "Peran"}</h5>
+                        <span className="text-[10px] text-zinc-500 font-mono">{item.original.period}</span>
+                      </div>
+                      <p className="text-[11px] text-[#06b6d4] font-medium font-mono">{item.original.company}</p>
+                      {item.original.tools && item.original.tools.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {item.original.tools.map((t, i) => (
+                            <span key={i} className="text-[9px] bg-white/[0.02] text-zinc-400 px-1.5 py-0.5 rounded border border-white/[0.02] font-mono">{t}</span>
+                          ))}
+                        </div>
                       )}
-                      <p className="text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed italic">
-                        "{imp.before || "Data sebelum tersedia"}"
-                      </p>
+                      <ul className="list-disc list-inside space-y-1 pt-1.5">
+                        {(item.original.highlights || []).map((h, i) => (
+                          <li key={i} className="text-[11px] text-zinc-450 leading-relaxed font-sans text-zinc-405">{h}</li>
+                        ))}
+                      </ul>
                     </div>
                   ))
                 ) : (
@@ -406,18 +484,28 @@ export default function CvAuditorResults({
 
             {/* Education Left */}
             {activeTabSection === "education" && (
-              <div className="space-y-3 animate-fade-in text-zinc-300">
-                {eduImps.length > 0 ? (
-                  eduImps.map((imp, idx) => (
-                    <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                      {imp.section && (
-                        <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono font-extrabold uppercase block w-max mb-1">
-                          {imp.section}
-                        </span>
+              <div className="space-y-3 text-zinc-350">
+                {recs.education.length > 0 ? (
+                  recs.education.map((item, idx) => (
+                    <div key={idx} className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-2">
+                      <div className="flex flex-col sm:flex-row justify-between items-start gap-1">
+                        <h5 className="text-xs font-bold text-white font-sans">{item.original.institution}</h5>
+                        <span className="text-[10px] text-zinc-500 font-mono">{item.original.period}</span>
+                      </div>
+                      <p className="text-[11px] text-[#06b6d4] font-mono">{item.original.degree} {item.original.major}</p>
+                      {item.original.gpa && (
+                        <p className="text-[10px] text-zinc-350 font-mono">GPA/IPK: <span className="font-bold text-zinc-200">{item.original.gpa}</span></p>
                       )}
-                      <p className="text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed italic">
-                        "{imp.before || "Data akademis sebelum tersedia"}"
-                      </p>
+                      {item.original.activities && item.original.activities.length > 0 && (
+                        <div className="pt-1.5 border-t border-white/[0.02]">
+                          <span className="text-[9px] text-zinc-500 font-mono font-bold uppercase tracking-wider block mb-1">Kegiatan / Detail akademik</span>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            {item.original.activities.map((act, i) => (
+                              <li key={i} className="text-[10px] text-zinc-455 font-sans">{act}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -430,61 +518,63 @@ export default function CvAuditorResults({
 
             {/* Skills Left */}
             {activeTabSection === "skills" && (
-              <div className="space-y-4 animate-fade-in text-zinc-300">
-                {skillsImps.length > 0 ? (
-                  <div className="space-y-3">
-                    {skillsImps.map((imp, idx) => (
-                      <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                        <span className="text-[9px] font-mono text-xs text-zinc-400 block uppercase font-bold text-cyan-400">
-                          {imp.section || "Skill / Kompetensi"}
-                        </span>
-                        <p className="text-xs font-mono text-zinc-300 leading-normal">
-                          {imp.before}
-                        </p>
-                      </div>
+              <div className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-3">
+                {recs.skills.original && recs.skills.original.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {recs.skills.original.map((skill, idx) => (
+                      <span key={idx} className="text-[10px] bg-white/[0.03] text-zinc-300 border border-white/[0.02] px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1">
+                        <span className="w-1 h-1 bg-zinc-400 rounded-full"></span>
+                        {skill}
+                      </span>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <p className="text-xs text-zinc-400 font-medium">Kata kunci/Keahlian terdeteksi dari draf asli Anda:</p>
-                    {cv.keyword_gap && cv.keyword_gap.length > 0 ? (
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {cv.keyword_gap.slice(0, 8).map((word, idx) => (
-                          <span key={idx} className="text-[10px] bg-zinc-800 text-zinc-350 border border-white/[0.04] px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1.5">
-                            <span className="w-1 h-1 bg-zinc-400 rounded-full"></span>
-                            {word}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
-                        Data belum tersedia. Silakan cantumkan keahlian teknis secara berurutan dalam CV Anda.
-                      </p>
-                    )}
-                  </div>
+                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum tersedia. Silakan cantumkan keahlian teknis secara berurutan dalam CV Anda.
+                  </p>
                 )}
               </div>
             )}
 
-            {/* Summary Left */}
-            {activeTabSection === "summary" && (
-              <div className="space-y-3 animate-fade-in text-zinc-300">
-                {summaryImps.length > 0 ? (
-                  summaryImps.map((imp, idx) => (
-                    <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                      {imp.section && (
-                        <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono font-extrabold uppercase block w-max mb-1">
-                          {imp.section}
+            {/* Projects Left */}
+            {activeTabSection === "projects" && (
+              <div className="space-y-3">
+                {recs.projects.length > 0 ? (
+                  <div className="space-y-2">
+                    {recs.projects.map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300 bg-white/[0.01] p-2.5 rounded border border-white/[0.01]">
+                        <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-450 text-[9px] font-bold shrink-0 mt-0.5 flex items-center justify-center">
+                          {idx + 1}
                         </span>
-                      )}
-                      <p className="text-xs font-mono text-zinc-300 whitespace-pre-wrap leading-relaxed italic">
-                        "{imp.before || "Data ringkasan eksekutif sebelum tersedia"}"
-                      </p>
-                    </div>
-                  ))
+                        <span className="leading-relaxed font-sans text-zinc-350">{item.original}</span>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-xs font-mono text-zinc-300 leading-relaxed whitespace-pre-wrap p-4 bg-[#030712] rounded-xl border border-white/[0.03]">
-                    {cvText ? (cvText.length > 300 ? cvText.substring(0, 300) + "..." : cvText) : "Data belum tersedia di CV."}
+                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum tersedia. Silakan cantumkan proyek portofolio Anda.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Certifications Left */}
+            {activeTabSection === "certifications" && (
+              <div className="space-y-3">
+                {recs.certifications.length > 0 ? (
+                  <div className="space-y-2">
+                    {recs.certifications.map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs text-zinc-300 bg-white/[0.01] p-2.5 rounded border border-white/[0.01]">
+                        <span className="w-5 h-5 rounded-full bg-zinc-800 text-zinc-450 text-[9px] font-bold shrink-0 mt-0.5 flex items-center justify-center font-mono">
+                          {idx + 1}
+                        </span>
+                        <span className="leading-relaxed font-sans text-zinc-350">{item.original}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum tersedia. Silakan sertakan sertifikasi yang Anda miliki.
                   </p>
                 )}
               </div>
@@ -502,32 +592,60 @@ export default function CvAuditorResults({
               </span>
             </div>
             
-            <span className="text-[9px] bg-emerald-505/10 border border-emerald-500/25 text-emerald-400 font-mono font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
+            <span className="text-[9px] bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 font-mono font-bold px-2 py-0.5 rounded uppercase flex items-center gap-1">
               <Check className="w-3 h-3" />
               Professional Rewrite
             </span>
           </div>
 
-          <div className="min-h-[220px]">
+          <div className="min-h-[220px] space-y-4">
+            {/* Summary Right */}
+            {activeTabSection === "summary" && (
+              <div className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all space-y-3 animate-fade-in animate-duration-300">
+                <p className="text-xs font-sans text-zinc-150 leading-relaxed whitespace-pre-wrap">
+                  {recs.summary.optimized}
+                </p>
+                <div className="flex justify-end pt-1">
+                  <button
+                    onClick={() => copyToClipboard(recs.summary.optimized, "summary_copy")}
+                    className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                  >
+                    {copiedText === "summary_copy" ? (
+                      <>
+                        <Check className="w-3 h-3 text-emerald-600" />
+                        <span>Disalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3 h-3" />
+                        <span>Salin Ringkasan</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Experience Right */}
             {activeTabSection === "experience" && (
               <div className="space-y-4 animate-fade-in">
-                {expImps.length > 0 ? (
-                  expImps.map((imp, idx) => (
-                    <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
+                {recs.experience.length > 0 ? (
+                  recs.experience.map((item, idx) => (
+                    <div key={idx} className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all space-y-3">
                       <div className="flex justify-between items-start gap-4">
-                        <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
-                          POSISI: {imp.section || "Kerjaan"}
-                        </span>
+                        <div>
+                          <h5 className="text-xs font-bold text-zinc-100 font-sans">{item.optimized.role || item.original.role}</h5>
+                          <p className="text-[10px] text-[#10b981] font-mono leading-tight mt-0.5">{item.optimized.company || item.original.company}</p>
+                        </div>
                         
                         <button
-                          onClick={() => copyToClipboard(imp.after, `exp_copy_${idx}`)}
-                          className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                          onClick={() => copyToClipboard((item.optimized.highlights || []).join("\n"), `exp_copy_${idx}`)}
+                          className="bg-white hover:bg-zinc-200 text-[#030712] px-2.5 py-1 rounded-md text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
                         >
                           {copiedText === `exp_copy_${idx}` ? (
                             <>
                               <Check className="w-3 h-3 text-emerald-600" />
-                              <span className="text-zinc-500">Disalin</span>
+                              <span>Disalin</span>
                             </>
                           ) : (
                             <>
@@ -538,9 +656,14 @@ export default function CvAuditorResults({
                         </button>
                       </div>
 
-                      <p className="text-xs font-mono text-zinc-100 leading-relaxed">
-                        "{imp.after}"
-                      </p>
+                      <div className="text-[9px] font-mono font-bold uppercase tracking-wider bg-emerald-500/5 text-emerald-400 border border-emerald-500/10 px-2 py-0.5 rounded block w-max select-none">
+                        Optimasi XYZ Formula
+                      </div>
+                      <ul className="list-disc list-inside space-y-1.5 pl-1">
+                        {(item.optimized.highlights || item.original.highlights || []).map((h, i) => (
+                          <li key={i} className="text-[11px] text-zinc-205 leading-relaxed font-sans">{h}</li>
+                        ))}
+                      </ul>
                     </div>
                   ))
                 ) : (
@@ -554,22 +677,23 @@ export default function CvAuditorResults({
             {/* Education Right */}
             {activeTabSection === "education" && (
               <div className="space-y-4 animate-fade-in">
-                {eduImps.length > 0 ? (
-                  eduImps.map((imp, idx) => (
-                    <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
+                {recs.education.length > 0 ? (
+                  recs.education.map((item, idx) => (
+                    <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all space-y-3">
                       <div className="flex justify-between items-start gap-4">
-                        <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
-                          STUDI: {imp.section || "Akademik"}
-                        </span>
+                        <div>
+                          <h5 className="text-xs font-bold text-zinc-100 font-sans">{item.optimized.institution || item.original.institution}</h5>
+                          <p className="text-[10px] text-emerald-400 font-mono mt-0.5">{item.optimized.degree || item.original.degree} {item.optimized.major || item.original.major}</p>
+                        </div>
                         
                         <button
-                          onClick={() => copyToClipboard(imp.after, `edu_copy_${idx}`)}
-                          className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                          onClick={() => copyToClipboard(`${item.optimized.degree || item.original.degree} ${item.optimized.major || item.original.major} - ${item.optimized.institution || item.original.institution}`, `edu_copy_${idx}`)}
+                          className="bg-white hover:bg-zinc-200 text-[#030712] px-2.5 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                         >
                           {copiedText === `edu_copy_${idx}` ? (
                             <>
-                              <Check className="w-3 h-3 text-emerald-605" />
-                              <span className="text-zinc-500">Disalin</span>
+                              <Check className="w-3 h-3 text-emerald-600" />
+                              <span>Disalin</span>
                             </>
                           ) : (
                             <>
@@ -580,9 +704,19 @@ export default function CvAuditorResults({
                         </button>
                       </div>
 
-                      <p className="text-xs font-mono text-zinc-100 leading-relaxed">
-                        "{imp.after}"
-                      </p>
+                      {item.optimized.gpa && (
+                        <p className="text-[10px] text-emerald-400 font-mono font-medium">IPK Dioptimasi: <span className="font-bold">{item.optimized.gpa}</span></p>
+                      )}
+                      {item.optimized.activities && item.optimized.activities.length > 0 && (
+                        <div className="pt-1.5 border-t border-white/[0.02]/50 space-y-1">
+                          <span className="text-[9px] text-[#10b981] font-mono font-bold uppercase block">Pelajaran Akademik Relevan</span>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            {item.optimized.activities.map((act, i) => (
+                              <li key={i} className="text-[10px] text-zinc-250 font-sans">{act}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </div>
                   ))
                 ) : (
@@ -596,23 +730,67 @@ export default function CvAuditorResults({
             {/* Skills Right */}
             {activeTabSection === "skills" && (
               <div className="space-y-4 animate-fade-in">
-                {skillsImps.length > 0 ? (
-                  <div className="space-y-3.5">
-                    {skillsImps.map((imp, idx) => (
-                      <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
-                        <div className="flex justify-between items-start gap-4">
-                          <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
-                            PEMETAAN: {imp.section || "Keahlian"}
+                <div className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all space-y-3.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-mono text-emerald-400 block uppercase font-bold">
+                      Pengelompokan &amp; Penyelarasan Keahlian
+                    </span>
+                    {recs.skills.optimized && recs.skills.optimized.length > 0 && (
+                      <button
+                        onClick={() => copyToClipboard(recs.skills.optimized.join(", "), "skills_copy")}
+                        className="bg-white hover:bg-zinc-200 text-[#030712] px-2.5 py-1 rounded-md text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        {copiedText === "skills_copy" ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>Disalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Semua</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {recs.skills.optimized && recs.skills.optimized.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {recs.skills.optimized.map((skill, idx) => (
+                        <span key={idx} className="text-[10px] bg-emerald-500/5 text-emerald-300 border border-emerald-500/10 px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1 transition-transform">
+                          <span className="w-1 h-1 bg-emerald-400 rounded-full"></span>
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-zinc-500 italic font-mono text-center py-2">
+                      Tidak ada data keahlian untuk dioptimasi.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Projects Right */}
+            {activeTabSection === "projects" && (
+              <div className="space-y-4 animate-fade-in">
+                {recs.projects.length > 0 ? (
+                  <div className="space-y-3">
+                    {recs.projects.map((item, idx) => (
+                      <div key={idx} className="p-3 bg-[#030712] rounded-lg border border-white/[0.02] hover:border-emerald-500/10 space-y-2.5">
+                        <div className="flex justify-between items-center gap-3">
+                          <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                            Proyek {idx + 1}
                           </span>
-                          
                           <button
-                            onClick={() => copyToClipboard(imp.after, `skills_copy_${idx}`)}
-                            className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            onClick={() => copyToClipboard(item.optimized, `proj_copy_${idx}`)}
+                            className="bg-white hover:bg-zinc-200 text-[#030712] px-2.5 py-1 rounded text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
                           >
-                            {copiedText === `skills_copy_${idx}` ? (
+                            {copiedText === `proj_copy_${idx}` ? (
                               <>
                                 <Check className="w-3 h-3 text-emerald-600" />
-                                <span className="text-[#030712]">Disalin</span>
+                                <span>Disalin</span>
                               </>
                             ) : (
                               <>
@@ -622,72 +800,58 @@ export default function CvAuditorResults({
                             )}
                           </button>
                         </div>
-
-                        <p className="text-xs font-mono text-zinc-100 leading-relaxed">
-                          {imp.after}
+                        <p className="text-xs font-mono text-zinc-200 leading-relaxed whitespace-pre-wrap">
+                          "{item.optimized}"
                         </p>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <p className="text-xs text-zinc-400">Rekomendasi grouping format yang rapi &amp; bebas mengarang:</p>
-                    <div className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-3 font-mono text-xs text-zinc-300">
-                      <div>
-                        <span className="text-white block font-bold mb-0.5">• Keahlian Fungsional Terpilih:</span>
-                        <p className="text-zinc-400 font-medium">
-                          {cv.keyword_gap && cv.keyword_gap.length > 0 
-                            ? cv.keyword_gap.slice(0, 6).join(", ") 
-                            : "Menunggu ekstraksi CV"}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum tersedia untuk dioptimasi.
+                  </p>
                 )}
               </div>
             )}
 
-            {/* Summary Right */}
-            {activeTabSection === "summary" && (
+            {/* Certifications Right */}
+            {activeTabSection === "certifications" && (
               <div className="space-y-4 animate-fade-in">
-                {summaryImps.length > 0 ? (
-                  summaryImps.map((imp, idx) => (
-                    <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
-                      <div className="flex justify-between items-start gap-4">
-                        <span className="text-[8px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
-                          SINTESIS RINGKASAN
-                        </span>
-                        
-                        <button
-                          onClick={() => copyToClipboard(imp.after, `summary_copy_${idx}`)}
-                          className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                        >
-                          {copiedText === `summary_copy_${idx}` ? (
-                            <>
-                              <Check className="w-3 h-3 text-emerald-500" />
-                              <span>Disalin</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3 h-3" />
-                              <span>Salin</span>
-                            </>
-                          )}
-                        </button>
+                {recs.certifications.length > 0 ? (
+                  <div className="space-y-3">
+                    {recs.certifications.map((item, idx) => (
+                      <div key={idx} className="p-3 bg-[#030712] rounded-lg border border-white/[0.02] hover:border-emerald-500/10 space-y-2">
+                        <div className="flex justify-between items-center gap-3">
+                          <span className="text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded font-mono font-bold uppercase">
+                            Sertifikasi {idx + 1}
+                          </span>
+                          <button
+                            onClick={() => copyToClipboard(item.optimized, `cert_copy_${idx}`)}
+                            className="bg-white hover:bg-zinc-200 text-[#030712] px-2 py-1 rounded text-[9px] font-mono font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                          >
+                            {copiedText === `cert_copy_${idx}` ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-600" />
+                                <span>Disalin</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3 h-3" />
+                                <span>Salin</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs font-mono text-[#e4e4e7] leading-relaxed">
+                          "{item.optimized}"
+                        </p>
                       </div>
-
-                      <p className="text-xs font-mono text-zinc-100 leading-relaxed whitespace-pre-wrap">
-                        "{imp.after}"
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <div className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] space-y-3">
-                    <p className="text-xs text-zinc-400">Ringkasan Karir Profesional:</p>
-                    <p className="text-xs font-mono text-zinc-250 italic">
-                      "Tuliskan deskripsi ringkas (3-4 kalimat) yang berisi latar belakang teknis Anda yang bersumber langsung dari CV tanpa menambahkan pencapaian di luar itu."
-                    </p>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum tersedia untuk dioptimasi.
+                  </p>
                 )}
               </div>
             )}
@@ -705,7 +869,7 @@ export default function CvAuditorResults({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pb-1">
           {getTabRecommendations().map((rec, i) => (
             <div key={i} className="p-3 bg-[#030712] rounded-xl border border-white/[0.02] flex items-start gap-2.5">
-              <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-[10px] font-bold font-mono shrink-0 mt-0.5">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center text-[10px] font-bold font-mono shrink-0 mt-0.5 animate-pulse">
                 {i + 1}
               </span>
               <p className="text-xs text-zinc-400 font-sans leading-relaxed">
@@ -720,7 +884,7 @@ export default function CvAuditorResults({
       <div className="bg-[#090d16] p-6 rounded-2xl border border-white/[0.04] flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="space-y-1.5 max-w-xl font-sans text-zinc-400">
           <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
+            <CheckCircle className="w-4.5 h-4.5 text-emerald-400 animate-pulse" />
             Audit Resume Selesai Dievaluasi
           </h4>
           <p className="text-xs leading-normal">

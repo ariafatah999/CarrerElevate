@@ -17,12 +17,14 @@ export interface ParsedExperience {
 export interface ParsedEducation {
   institution: string;
   major: string;
+  degree?: string;
   period?: string;
   gpa?: string;
   activities?: string[];
 }
 
 export interface ParsedData {
+  summary?: string;
   skills: string[];
   experience: ParsedExperience[];
   education: ParsedEducation[];
@@ -33,6 +35,20 @@ export interface ParsedData {
   confidence_remarks?: string;
 }
 
+export interface RecommendationItemOriginalOptimized<T> {
+  original: T;
+  optimized: T;
+}
+
+export interface RecommendationResult {
+  summary: RecommendationItemOriginalOptimized<string>;
+  education: Array<RecommendationItemOriginalOptimized<ParsedEducation>>;
+  experience: Array<RecommendationItemOriginalOptimized<ParsedExperience>>;
+  skills: RecommendationItemOriginalOptimized<string[]>;
+  projects: Array<RecommendationItemOriginalOptimized<string>>;
+  certifications: Array<RecommendationItemOriginalOptimized<string>>;
+}
+
 export interface CvAnalysis {
   ats_score: number;
   keyword_gap: string[];
@@ -41,6 +57,7 @@ export interface CvAnalysis {
   candidate_socials?: string[];
   target_optimizations?: string[];
   parsed_data?: ParsedData;
+  recommendations?: RecommendationResult;
 }
 
 export interface LinkedinOptimization {
@@ -50,6 +67,10 @@ export interface LinkedinOptimization {
   summary_improvement_notes: string[];
   experience_recommendations: string[];
   education_recommendations: string[];
+  skills_recommendations?: string[];
+  certifications_recommendations?: string[];
+  projects_recommendations?: string[];
+  achievements_recommendations?: string[];
 }
 
 export interface AnalysisResponse {

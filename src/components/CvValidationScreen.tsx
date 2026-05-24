@@ -20,6 +20,7 @@ import { ParsedEducation, ParsedExperience } from "../types";
 export interface ParsedCvResultData {
   candidate_name: string;
   candidate_socials: string[];
+  summary?: string;
   education: Array<{
     institution: string;
     degree: string;
@@ -72,6 +73,7 @@ export default function CvValidationScreen({
   // Local state for full editability
   const [candidateName, setCandidateName] = useState(parsedData.candidate_name || "Kandidat");
   const [socialsInput, setSocialsInput] = useState((parsedData.candidate_socials || []).join(", "));
+  const [summary, setSummary] = useState(parsedData.summary || "");
   const [educations, setEducations] = useState(parsedData.education || []);
   const [experiences, setExperiences] = useState(parsedData.experience || []);
   const [skillsText, setSkillsText] = useState((parsedData.skills || []).join(", "));
@@ -97,6 +99,7 @@ export default function CvValidationScreen({
     const updated: ParsedCvResultData = {
       candidate_name: candidateName,
       candidate_socials: socialsInput.split(",").map(s => s.trim()).filter(Boolean),
+      summary: summary,
       education: educations,
       experience: experiences,
       skills: skillsText.split(",").map(s => s.trim()).filter(Boolean),
@@ -130,7 +133,7 @@ export default function CvValidationScreen({
   // Run synchronization whenever locals change
   useEffect(() => {
     synchronizeState();
-  }, [candidateName, socialsInput, educations, experiences, skillsText, projects, certifications, achievements]);
+  }, [candidateName, socialsInput, summary, educations, experiences, skillsText, projects, certifications, achievements]);
 
   // Handler functions for adding/deleting rows
   const addEducation = () => {
@@ -310,6 +313,29 @@ export default function CvValidationScreen({
                 className="w-full bg-[#030712] text-white px-4 py-2.5 rounded-lg border border-white/[0.05] focus:outline-none focus:border-[#06b6d4] text-xs font-mono"
               />
             </div>
+          </div>
+        </div>
+
+        {/* SECTION A2: Professional Summary */}
+        <div className="bg-[#090d16] p-5.5 rounded-2xl border border-white/[0.04] space-y-4">
+          <div className="flex items-center gap-2 border-b border-white/[0.03] pb-3">
+            <FileText className="w-4 h-4 text-[#06b6d4]" />
+            <span className="text-[10px] font-mono font-bold text-zinc-300 uppercase tracking-wider">
+              1A. Professional Summary / Deskripsi Diri
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-mono text-zinc-400 font-bold uppercase block">
+              Ringkasan Profil Karir Profesional
+            </label>
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder="Tulis ringkasan profil profesional atau biarkan AI mengekstrak otomatis..."
+              rows={4}
+              className="w-full bg-[#030712] text-zinc-100 px-4 py-3 rounded-lg border border-white/[0.05] focus:outline-none focus:border-[#06b6d4] text-xs font-sans leading-relaxed"
+            />
           </div>
         </div>
 

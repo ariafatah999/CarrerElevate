@@ -247,6 +247,7 @@ export default function App() {
       // Ensure the validated parsed data is synchronized back into the activeAnalysis so results page can render it
       if (result.cv_analysis) {
         result.cv_analysis.parsed_data = {
+          summary: payload.summary,
           skills: payload.skills,
           experience: payload.experience,
           education: payload.education,
