@@ -155,16 +155,26 @@ export default function LinkedinInput({
 
           <div className="flex flex-col sm:flex-row gap-2 justify-between items-start sm:items-center pt-3 border-t border-white/[0.04]">
             <p className="text-[10px] text-zinc-500 font-mono">Ekspor PDF profil LinkedIn memberi tingkat optimasi tertinggi.</p>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleInjectSampleLinkedin();
-              }}
-              className="text-[10px] sm:text-xs font-mono font-bold text-cyan-400 hover:text-[#06b6d4] hover:underline cursor-pointer transition-colors"
-            >
-              ⚡ Coba Sample LinkedIn
-            </button>
+            <div className="flex items-center gap-3">
+              <a
+                href="/samples/sample-linkedin.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] sm:text-xs font-mono text-zinc-400 hover:text-white underline cursor-pointer transition-colors flex items-center gap-1"
+              >
+                📄 Preview PDF
+              </a>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleInjectSampleLinkedin();
+                }}
+                className="text-[10px] sm:text-xs font-mono font-bold text-cyan-400 hover:text-[#06b6d4] hover:underline cursor-pointer transition-colors"
+               >
+                ⚡ Coba Sample LinkedIn
+              </button>
+            </div>
           </div>
         </div>
 
