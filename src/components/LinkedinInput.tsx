@@ -19,6 +19,7 @@ interface LinkedinInputProps {
   setLinkedinProfileText: (text: string) => void;
   handleLinkedinPdfUpload: (file: File) => Promise<void>;
   triggerLinkedinOptimization: () => Promise<void>;
+  handleInjectSampleLinkedin: () => void;
 }
 
 export default function LinkedinInput({
@@ -31,11 +32,13 @@ export default function LinkedinInput({
   linkedinTargetRole,
   setLinkedinTargetRole,
   linkedinErrorMessage,
+  setLinkedinErrorMessage,
   setLinkedinPdfFileName,
   linkedinPdfFileName,
   isParsingLinkedinPdf,
   handleLinkedinPdfUpload,
-  triggerLinkedinOptimization
+  triggerLinkedinOptimization,
+  handleInjectSampleLinkedin
 }: LinkedinInputProps) {
   const [isLinkedinDragOver, setIsLinkedinDragOver] = useState(false);
 
@@ -148,6 +151,20 @@ export default function LinkedinInput({
                 <p className="text-[10px] text-zinc-500 font-mono">Atau klik untuk mengunggah dari penyimpanan lokal</p>
               </div>
             )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 justify-between items-start sm:items-center pt-3 border-t border-white/[0.04]">
+            <p className="text-[10px] text-zinc-500 font-mono">Ekspor PDF profil LinkedIn memberi tingkat optimasi tertinggi.</p>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleInjectSampleLinkedin();
+              }}
+              className="text-[10px] sm:text-xs font-mono font-bold text-cyan-400 hover:text-[#06b6d4] hover:underline cursor-pointer transition-colors"
+            >
+              ⚡ Coba Sample LinkedIn
+            </button>
           </div>
         </div>
 

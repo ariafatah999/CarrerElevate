@@ -151,9 +151,9 @@ export default function CvAuditorInput({
               e.stopPropagation();
               handleInjectSampleCv();
             }}
-            className="text-[10px] sm:text-xs font-semibold text-zinc-200 hover:text-white underline cursor-pointer transition-colors"
+            className="text-[10px] sm:text-xs font-mono font-bold text-cyan-400 hover:text-[#06b6d4] hover:underline cursor-pointer transition-colors"
           >
-            ⚡ Gunakan Contoh CV Demo (Uji Coba Seketika)
+            ⚡ Coba Sample CV
           </button>
         </div>
       </div>

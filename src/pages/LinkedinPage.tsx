@@ -26,6 +26,7 @@ interface LinkedinPageProps {
   setLinkedinProfileText: (val: string) => void;
   handleLinkedinPdfUpload: (file: File) => Promise<void>;
   triggerLinkedinParser: () => Promise<void>;
+  handleInjectSampleLinkedin: () => void;
 
   // Flow baru states
   parsedLinkedinResult: ParsedLinkedinResultData | null;
@@ -61,6 +62,7 @@ export default function LinkedinPage({
   setLinkedinProfileText,
   handleLinkedinPdfUpload,
   triggerLinkedinParser,
+  handleInjectSampleLinkedin,
 
   parsedLinkedinResult,
   setParsedLinkedinResult,
@@ -117,6 +119,7 @@ export default function LinkedinPage({
         setLinkedinProfileText={setLinkedinProfileText}
         handleLinkedinPdfUpload={handleLinkedinPdfUpload}
         triggerLinkedinOptimization={triggerLinkedinParser}
+        handleInjectSampleLinkedin={handleInjectSampleLinkedin}
       />
     );
   }
