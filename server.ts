@@ -604,47 +604,162 @@ Tolong buat kalkulasi ATS Score yang jujur, analisis keyword gapped, ulasan rewr
   }
 });
 
-// 2. Extra endpoint for LinkedIn Profile Optimization
-app.post("/api/optimize-linkedin", async (req, res) => {
+// 2. Extra endpoints for LinkedIn Profile Parsing & Optimization
+app.post("/api/parse-linkedin", async (req, res) => {
   try {
-    const { headlineLama, summaryLama, tone, targetRole, profileText } = req.body;
+    const { headlineLama, summaryLama, targetRole, profileText } = req.body;
 
     const ai = getGeminiClient();
 
-    const systemInstruction = `Kamu adalah HRD Tech Recruiter Senior, LinkedIn Branding Expert, dan Konsultan Karier di sistem "CareerElevate AI". Tugasmu adalah mengoptimalkan profil LinkedIn (Headline, Summary/About, Experience, dan Education) pengguna dengan Tone: ${tone || "Professional"}, untuk posisi target: ${targetRole || "Software Engineer"}.
-Semua respon dalam bahasa Indonesia berkualitas tinggi, formal, profesional, dan tajam.`;
+    const systemInstruction = `Kamu adalah Ahli Data Profiling Karir dan Real-time Semantic Parser di CareerElevate AI.
+Tugas utamamu adalah mendeteksi secara cerdas dan mengekstrak rincian profil LinkedIn / CV pengguna ke dalam format JSON terstruktur yang tervalidasi.
 
-    let prompt = "";
-    if (profileText) {
-      prompt = `Berikut adalah seluruh konten profil/CV LinkedIn yang diunggah dari berkas PDF:
-=== KONTEN PROFIL PDF ===
-${profileText}
-=========================
+BERIKUT ADALAH PRINSIP DAN KETENTUAN KHUSUS PARSING DATA SEMANTIK:
+1. JANGAN PERNAH HANYA BACA HEADING EXACT:
+   Parser harus bisa membaca variasi data dari mana saja termasuk CV, profile summary, experience, education, certification, project, skills, achievement, dan teks bebas user yang tidak teratur.
+   
+2. DETEKSI DENGAN KONTEKS (CONTEXT-AWARE FALLBACK DETECTION):
+   Jika format tidak rapi hibrida atau tidak memakai heading, kamu harus mendeteksi secara kontekstual:
+   - Jika ada teks mengandung institusi/sekolah dan jurusan/program, contoh: "STT Terpadu Nurul Fikri - Teknik Informatika", maka teks ini wajib masuk ke kategori Education.
+   - Jika terdapat teks yang memuat list sertifikat atau sebutan teknis spesifik lulusan, contoh: "MTCNA, MTCRE, MTCTCE" atau "CCNA, AWS Certified", maka wajib dideteksi dengan benar dan dimasukkan ke kategori Certifications.
+   - Jika terdapat baris prestasi atau kompetisi seperti "NXCTF" atau "Hackathon Juara 2", maka wajib dideteksi secara cerdas dan dimasukkan ke Projects atau Achievements sesuai konteks data.
 
-Posisi target: ${targetRole || "Web Developer"}
-Tone yang diinginkan: ${tone || "Professional"}
+3. ZERO FABRICATION (ANTI-HALUSINASI):
+   - Isi seluruh field hanya berdasarkan bukti empiris dalam teks yang dikirimkan.
+   - Jika data suatu bagian (seperti prestasi atau sertifikasi) tidak ditemukan sama sekali di dalam input, kembalikan nilai kosong (string kosong "" atau array kosong []). Jangan mengarang data imajiner!
+`;
 
-Buatlah optimasi profil LinkedIn berdasarkan informasi teks profil/CV PDF di atas. Temukan info ringkasan atau detail pekerjaan di dalam teks tersebut dan formulasikan headline, summary, rekomendasi LinkedIn Experience (Pengalaman), serta rekomendasi LinkedIn Education (Pendidikan) yang jauh lebih baik dan dioptimalkan lengkap.
-Berikan 3 rekomendasi headline menarik yang relevan dengan kata kunci optimasi algoritma LinkedIn (SEO) dan headline tingkat CTR tinggi.
-Lalu buat ringkasan profil LinkedIn (summary_after) yang memikat berbasis storytelling profesional (about section) dengan format Jakarta/Modern style yang rapi, mencakup keterampilan, beberapa pencapaian/proyek, dan call to action (kontak/email).
-Hasilkan pula 'experience_recommendations' berisi list rekomendasi penulisan / rewrite konkret untuk bagian pengalaman kerja, dan 'education_recommendations' berisi saran konkret untuk bagian pendidikan dari data CV. Serta sertakan 'summary_improvement_notes' secara list berisi penjelasan strategi optimasi.`;
-    } else {
-      prompt = `Berikut adalah data profil LinkedIn saat ini:
-=== HEADLINE LAMA ===
-${headlineLama || "Mahasiswa IT"}
-=============
+    const prompt = `Berikut adalah data profil LinkedIn / CV kasar Pengguna:
+=== ANALISIS SUMBER INPUT ===
+Headline Lama Manual: ${headlineLama || ""}
+Summary Lama Manual: ${summaryLama || ""}
+Target Role yang Dituju: ${targetRole || ""}
 
-=== SUMMARY/ABOUT LAMA ===
-${summaryLama || "Saya adalah mahasiswa IT S1."}
-=============
+Teks Berkas PDF / Profil Bebas:
+${profileText || ""}
+=============================
 
-Posisi target: ${targetRole || "Web Developer"}
-Tone yang diinginkan: ${tone || "Professional"}
+Tolong lakukan parsing data semantik, terapkan aturan deteksi dengan konteks untuk institusi/sertifikasi/nama kompetisi, dan hasilkan output JSON terstruktur yang valid.`;
 
-Buatlah optimasi profil LinkedIn berdasarkan informasi di atas. Berikan 3 rekomendasi headline menarik yang relevan dengan kata kunci optimasi algoritma LinkedIn (SEO) dan headline tingkat CTR tinggi.
-Lalu buat ringkasan profil LinkedIn (summary_after) yang memikat berbasis storytelling profesional (about section) dengan format Jakarta/Modern style yang rapi, mencakup keterampilan, beberapa pencapaian/proyek, dan call to action (kontak/email).
-Hasilkan pula 'experience_recommendations' berisi list rekomendasi penulisan / rewrite konkret untuk bagian pengalaman kerja, dan 'education_recommendations' berisi saran konkret untuk bagian pendidikan. Serta sertakan 'summary_improvement_notes' secara list berisi penjelasan strategi optimasi.`;
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            current_headline: { 
+              type: Type.STRING, 
+              description: "Headline lama pengguna. Jika tidak ada dan ada targetRole, formulasikan draf ringkas awal tanpa mengarang data palsu." 
+            },
+            about_summary: { 
+              type: Type.STRING, 
+              description: "Rangkuman profil atau ringkasan saat ini. Jika tidak ada, kembalikan string kosong." 
+            },
+            experience: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  company: { type: Type.STRING, description: "Nama instansi kerja/organisasi" },
+                  role: { type: Type.STRING, description: "Jabatan" },
+                  period: { type: Type.STRING, description: "Periode kerja" },
+                  tools: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Sistem, software, frameworks yang tertulis" },
+                  highlights: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Tugas, tanggung jawab, rincian aktivitas" }
+                },
+                required: ["company", "role"]
+              }
+            },
+            education: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  institution: { type: Type.STRING },
+                  major: { type: Type.STRING },
+                  period: { type: Type.STRING },
+                  gpa: { type: Type.STRING },
+                  activities: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ["institution", "major"]
+              }
+            },
+            skills: { type: Type.ARRAY, items: { type: Type.STRING } },
+            certifications: { type: Type.ARRAY, items: { type: Type.STRING } },
+            projects: { type: Type.ARRAY, items: { type: Type.STRING } },
+            achievements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            keywords: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: [
+            "current_headline", 
+            "about_summary", 
+            "experience", 
+            "education", 
+            "skills", 
+            "certifications", 
+            "projects", 
+            "achievements", 
+            "keywords"
+          ]
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) {
+      throw new Error("Received empty response from LinkedIn Parser AI.");
     }
+    res.json(JSON.parse(resultText));
+  } catch (error: any) {
+    console.error("Parse LinkedIn Error:", error);
+    res.status(500).json({ error: error.message || "Gagal mengurai profil LinkedIn." });
+  }
+});
+
+app.post("/api/optimize-linkedin", async (req, res) => {
+  try {
+    const { parsedData, tone, targetRole } = req.body;
+
+    if (!parsedData) {
+      res.status(400).json({ error: "Data LinkedIn tervalidasi wajib disertakan." });
+      return;
+    }
+
+    const ai = getGeminiClient();
+
+    const systemInstruction = `Kamu adalah Senior Tech Recruiter, LinkedIn Brand Specialist, dan Career Consultant.
+Tugas utamamu adalah memformulasikan optimasi profil LinkedIn (Headline, About/Summary, Experience, Education, Skills, Certifications, Projects) secara berkesinambungan dan setia pada data valid pengguna.
+
+BERIKUT ADALAH PRINSIP KETAT PENULISAN & FORMAT YANG WAJIB DIPATUHI:
+1. OPTIMIZER HANYA BOLEH MEMAKAI DETECTED DATA (ANTI HALUSINASI):
+   - Kamu DILARANG KERAS menghasilkan, menyimulasikan, atau mengarang pendidikan palsu, skill palsu, sertifikasi palsu, dan pengalaman serta pencapaian fiktif di resume kanan/optimized.
+   - Gunakan murni fakta empiris dari 'parsedData'. Jika suatu bagian riwayat tersebut kosong, maka di kolom Optimized wajib ditulis: "Data belum terdeteksi dari input." Jangan menggantinya dengan template dummy atau data karangan! 
+   - Jaga orisinalitas metrik. Jika data aslinya tidak mencantumkan persentase angka pencapaian, draf LinkedIn baru harus tetap profesional dan tertulis logis tanpa disandarkan pada kebohongan publik.
+
+2. REKOMENDASI HARUS SIMPLE & ACTIONABLE:
+   Hadirkan daftar ulasan 'summary_improvement_notes' yang praktis, pendek, ringkas tanpa bertele-tele.
+   - Contoh rekomendasi yang baik:
+     * Tambahkan keyword role utama di headline.
+     * Kelompokkan skills berdasarkan kategori.
+     * Perjelas impact pengalaman kerja.
+     * Tambahkan sertifikasi yang sudah terdeteksi.
+   - Hindari secara mutlak: penggunaan diagnostic matrix, ATS index rating, parser integrity, formula XYZ, jargon AI panjang lebar, template random, serta kalimat ulasan teoretis.
+
+3. SINKRONISASI TATA BAHASA (Indonesian Professional Tone: ${tone || "Professional"}):
+   Buatlah About section (summary_after) yang memikat berbasis silsilah asli dengan gaya menulis karir modern, asyik, berbobot, ramah SEO pencocokan rekruter LinkedIn.`;
+
+    const prompt = `Berikut adalah data profil LinkedIn / CV tervalidasi milik pengguna:
+=== DATA VALID SENSITIF FAKTA ===
+${JSON.stringify(parsedData, null, 2)}
+=================================
+
+Kriteria Optimasi Target:
+Target Role: ${targetRole || "Software Engineer"}
+Tone Bahasa: ${tone || "Professional"}
+
+Silakan formulasikan rekomendasi headline (3 opsi CTR tinggi), ringkasan About Me (summary_after) bercerita asyik tapi formal, draf pemolesan seksi Experience (bila ada), dan Education (bila ada) berdasarkan data asli di atas.`;
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
@@ -658,40 +773,47 @@ Hasilkan pula 'experience_recommendations' berisi list rekomendasi penulisan / r
             headline_recommendations: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "3 distinct highly-optimized, modern headline recommendations with industry keywords."
+              description: "3 draf rekomendasi headline LinkedIn CTR tinggi berdasarkan keahlian riil dan peran target."
             },
             summary_before_snippet: {
               type: Type.STRING,
-              description: "A short snippet representing the key weak area of the before profile."
+              description: "Snippet analisis singkat kelemahan ringkasan profil lama."
             },
             summary_after: {
               type: Type.STRING,
-              description: "A comprehensive LinkedIn profile summary featuring storytelling, core tech skills, projects, and a call-to-action style contact."
+              description: "Draf ringkasan About Me LinkedIn lengkap (storytelling) berdasarkan murni data valid."
             },
             summary_improvement_notes: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Strategy notes detailing what keywords were injected or storytelling tips."
+              description: "4 poin rekomendasi pendek, ringkas, dan actionable saja."
             },
             experience_recommendations: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "List of 2-3 specific recommendations or rewritten experience bullets."
+              description: "Rekomendasi penulisan / bullet point seksi Pengalaman di LinkedIn sesuai dengan data asli. Jika kosong pada data aslinya, kembalikan hanya ['Data belum terdeteksi dari input.']"
             },
             education_recommendations: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "List of 1-2 specific recommendations or rewritten education details."
+              description: "Rekomendasi penulisan seksi Pendidikan di LinkedIn. Jika kosong pada data aslinya, kembalikan hanya ['Data belum terdeteksi dari input.']"
             }
           },
-          required: ["headline_recommendations", "summary_before_snippet", "summary_after", "summary_improvement_notes", "experience_recommendations", "education_recommendations"]
+          required: [
+            "headline_recommendations", 
+            "summary_before_snippet", 
+            "summary_after", 
+            "summary_improvement_notes", 
+            "experience_recommendations", 
+            "education_recommendations"
+          ]
         }
       }
     });
 
     const resultText = response.text;
     if (!resultText) {
-      throw new Error("Received empty response from Gemini AI.");
+      throw new Error("Received empty response from LinkedIn Optimizer AI.");
     }
     res.json(JSON.parse(resultText));
   } catch (error: any) {

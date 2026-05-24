@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { 
-  Linkedin, 
   RefreshCcw, 
   ChevronLeft, 
   Sparkles, 
@@ -11,9 +10,12 @@ import {
   Award,
   Layers,
   AlertCircle,
-  Briefcase
+  Briefcase,
+  User,
+  FileText
 } from "lucide-react";
 import { AnalysisResponse } from "../types";
+import { ParsedLinkedinResultData } from "./LinkedinValidationScreen";
 
 interface LinkedinResultsProps {
   activeAnalysis: AnalysisResponse;
@@ -21,13 +23,12 @@ interface LinkedinResultsProps {
   setActiveTab: (tab: "cv-auditor" | "linkedin" | "history") => void;
   copyToClipboard: (text: string, label: string) => void;
   copiedText: string | null;
-  linkedinHeadlineLama: string;
-  linkedinSummaryLama: string;
+  parsedLinkedinResult: ParsedLinkedinResultData;
   linkedinTargetRole: string;
   linkedinTone: string;
 }
 
-type ActiveSection = "experience" | "education" | "skills" | "summary";
+type ActiveSection = "headline" | "about" | "experience" | "education" | "skills" | "certifications" | "projects";
 
 export default function LinkedinResults({
   activeAnalysis,
@@ -35,61 +36,53 @@ export default function LinkedinResults({
   setActiveTab,
   copyToClipboard,
   copiedText,
-  linkedinHeadlineLama,
-  linkedinSummaryLama,
+  parsedLinkedinResult,
   linkedinTargetRole,
   linkedinTone
 }: LinkedinResultsProps) {
   const opt = activeAnalysis.linkedin_optimization;
-  const cv = activeAnalysis.cv_analysis;
 
-  // Tabs matched to CvAuditorResults format
-  const [activeTabSection, setActiveTabSection] = useState<ActiveSection>("experience");
+  const [activeTabSection, setActiveTabSection] = useState<ActiveSection>("headline");
 
-  // Determine original profile references with precise, non-random fallbacks
-  const originalHeadline = linkedinHeadlineLama?.trim() || "";
-  const originalSummary = linkedinSummaryLama?.trim() || "";
-  
-  // Extract key technologies or skills detected without adding random technologies
-  const detectedSkills = cv.improvements
-    ?.filter(imp => {
-      const s = (imp.section || "").toLowerCase();
-      return s.includes("skill") || s.includes("keahlian") || s.includes("teknologi") || s.includes("tools");
-    })
-    .map(imp => imp.before)
-    .filter(Boolean) || [];
+  const originalHeadline = parsedLinkedinResult.current_headline?.trim() || "";
+  const originalSummary = parsedLinkedinResult.about_summary?.trim() || "";
 
-  // Fallback to keyword_gap if improvements doesn't have skill sections
-  const skillsToRender = detectedSkills.length > 0 
-    ? detectedSkills 
-    : (cv.keyword_gap?.slice(0, 8) || []);
-
-  // Simple, short recommendations based on tab type for LinkedIn
   const getTabRecommendations = (): string[] => {
     switch (activeTabSection) {
+      case "headline":
+        return [
+          "Gunakan headline yang mengandung kata kunci pencarian rekruter (SEO friendly).",
+          "Opsi CTR tinggi memadukan peran utama, spesialisasi teknis, dan value pencapaian."
+        ];
+      case "about":
+        return [
+          "Tulis rincian dengan nada personal tetapi profesional (storytelling).",
+          "Sertakan daftar teknologi utama dan kontak/email di akhir draf About me."
+        ];
       case "experience":
         return [
-          "Format deskripsi untuk LinkedIn disarankan lebih ringkas daripada di resume.",
-          "Gunakan poin pencapaian terukur untuk menyederhanakan pemindaian profil.",
-          "Cantumkan nama instansi perusahaan/institusi yang terhubung dengan akun official LinkedIn."
+          "Fokus pada tindakan (action verbs) dan pencapaian metrik bila ada.",
+          "Gunakan poin rincian terukur agar mudah dipindai rekruter dalam 6 detik."
         ];
       case "education":
         return [
-          "Sertakan nama universitas dan tahun kelulusan secara akurat.",
-          "Tuliskan deskripsi singkat murni untuk memperjelas spesifikasi fokus pembelajaran Anda.",
-          "Gunakan pencapaian nyata akademis tanpa melebih-lebihkannya."
+          "Cantumkan institusi, jurusan, serta IPK jika di atas rata-rata kelompok.",
+          "Anda dapat memperjelas kegiatan eksternal atau himpunan untuk memperkuat profil."
         ];
       case "skills":
         return [
-          "Tambahkan keahlian teknis terfokus ke seksi pencarian LinkedIn Skills.",
-          "Mintalah persetujuan kualifikasi (Endorsements) dari rekan kerja atau atasan jika ada.",
-          "Gunakan kategori keahlian yang disetujui standar pencarian LinkedIn."
+          "Urutkan daftar keahlian utama agar sesuai dengan filter pencarian HRD.",
+          "Fokuskan pada rumpun teknologi modern yang divalidasi di pasar kerja."
         ];
-      case "summary":
+      case "certifications":
         return [
-          "Buat ringkasan yang ramah rekruter serta mencakup kontak profesional di baris akhir.",
-          "Pilih variasi Headline yang paling representatif dengan target peran baru Anda.",
-          "Atur setelan pencarian menjadi 'Open To Work' agar memicu tanggapan rekruter."
+          "Sertifikasi resmi seperti MTCNA, CCNA, atau AWS mempercepat seleksi berkas.",
+          "Sebutkan instansi penerbit lisensi secara resmi untuk memicu badge LinkedIn."
+        ];
+      case "projects":
+        return [
+          "Showcase proyek nyata yang menunjukkan penguasaan teknologi Anda.",
+          "Sebutkan kontribusi krusial Anda dan tech-stack yang dipakai di proyek bersangkutan."
         ];
     }
   };
@@ -133,7 +126,7 @@ export default function LinkedinResults({
             className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-400 hover:text-white bg-[#030712] border border-white/[0.04] px-4.5 py-2.5 rounded-lg cursor-pointer transition-all"
           >
             <ChevronLeft className="w-4 h-4 text-zinc-400" />
-            <span>CV Auditor</span>
+            <span>CV ATS Auditor</span>
           </button>
         </div>
       </div>
@@ -152,6 +145,7 @@ export default function LinkedinResults({
               Tinjau draf tertulis untuk profil LinkedIn Anda. Seluruh usulan di seksi kanan bersandar penuh pada data riwayat hidup asli Anda tanpa penambahan kualifikasi imajiner.
             </p>
           </div>
+          
           <div className="bg-[#030712]/95 border border-white/[0.03] p-4 rounded-xl flex items-center gap-4 shrink-0 shadow-lg w-full lg:w-auto">
             <div className="space-y-1">
               <span className="text-[8px] text-[#06B6D4] font-mono font-bold block uppercase tracking-wide">TARGET ROLE SPECIFIC</span>
@@ -167,6 +161,30 @@ export default function LinkedinResults({
 
       {/* 3. COHESIVE TAB NAVIGATION */}
       <div className="bg-[#090d16] p-1.5 rounded-xl border border-white/[0.04] flex flex-wrap gap-1">
+        <button
+          onClick={() => setActiveTabSection("headline")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTabSection === "headline" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <User className="w-3.5 h-3.5" />
+          <span>Headline</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection("about")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTabSection === "about" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <BookOpen className="w-3.5 h-3.5" />
+          <span>About</span>
+        </button>
+
         <button
           onClick={() => setActiveTabSection("experience")}
           className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
@@ -204,15 +222,27 @@ export default function LinkedinResults({
         </button>
 
         <button
-          onClick={() => setActiveTabSection("summary")}
+          onClick={() => setActiveTabSection("certifications")}
           className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-            activeTabSection === "summary" 
+            activeTabSection === "certifications" 
               ? "bg-white/[0.04] border border-white/[0.08] text-white" 
               : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
           }`}
         >
-          <BookOpen className="w-3.5 h-3.5" />
-          <span>Summary / About</span>
+          <Award className="w-3.5 h-3.5" />
+          <span>Certifications</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTabSection("projects")}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+            activeTabSection === "projects" 
+              ? "bg-white/[0.04] border border-white/[0.08] text-white" 
+              : "text-zinc-400 hover:text-white hover:bg-white/[0.01]"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Projects</span>
         </button>
       </div>
 
@@ -225,41 +255,79 @@ export default function LinkedinResults({
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               <span className="text-[10px] font-mono text-zinc-400 font-extrabold uppercase tracking-wider">
-                CURRENT PROFILE (DRAF ASLI)
+                CURRENT PROFILE (DATA UTAMA)
               </span>
             </div>
-            <span className="text-[9px] bg-amber-500/10 text-amber-450 border border-amber-500/10 px-2 py-0.5 rounded font-mono font-semibold text-amber-405 text-amber-400">
+            <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/10 px-2 py-0.5 rounded font-mono font-semibold">
               Needs Sync
             </span>
           </div>
 
           <div className="min-h-[220px]">
+            {/* Headline Left */}
+            {activeTabSection === "headline" && (
+              <div className="space-y-3 animate-fade-in text-zinc-300">
+                {originalHeadline ? (
+                  <div className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] text-xs font-mono text-zinc-300">
+                    {originalHeadline}
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* About Left */}
+            {activeTabSection === "about" && (
+              <div className="space-y-3 animate-fade-in text-zinc-300">
+                {originalSummary ? (
+                  <div className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] text-xs font-mono text-zinc-350 whitespace-pre-wrap leading-relaxed">
+                    {originalSummary}
+                  </div>
+                ) : (
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Experience Left */}
             {activeTabSection === "experience" && (
               <div className="space-y-3 animate-fade-in text-zinc-300">
-                {cv.improvements?.filter(i => {
-                  const s = (i.section || "").toLowerCase();
-                  return s.includes("kerja") || s.includes("work") || s.includes("experience") || s.includes("pengalaman");
-                }).length > 0 ? (
-                  cv.improvements
-                    ?.filter(i => {
-                      const s = (i.section || "").toLowerCase();
-                      return s.includes("kerja") || s.includes("work") || s.includes("experience") || s.includes("pengalaman");
-                    })
-                    .slice(0, 3)
-                    .map((imp, idx) => (
-                      <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                        <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono font-bold block w-max uppercase mb-1">
-                          {imp.section || "Jabatan"}
-                        </span>
-                        <p className="text-xs font-mono text-zinc-300 leading-relaxed italic">
-                          "{imp.before || "Data sebelum tersedia"}"
-                        </p>
+                {parsedLinkedinResult.experience && parsedLinkedinResult.experience.length > 0 ? (
+                  <div className="space-y-3">
+                    {parsedLinkedinResult.experience.map((exp, idx) => (
+                      <div key={idx} className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-2">
+                        <div className="flex justify-between items-start">
+                          <h5 className="text-xs font-bold font-mono text-cyan-400">{exp.role}</h5>
+                          <span className="text-[9px] font-mono text-zinc-550">{exp.period}</span>
+                        </div>
+                        <p className="text-[10px] font-mono text-zinc-400 font-semibold">{exp.company}</p>
+                        {exp.tools && exp.tools.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {exp.tools.map((tool, i) => (
+                              <span key={i} className="text-[9px] bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded font-mono">
+                                {tool}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {exp.highlights && exp.highlights.length > 0 && (
+                          <ul className="list-disc pl-4 space-y-1 text-[11px] text-zinc-400">
+                            {exp.highlights.map((high, i) => (
+                              <li key={i}>{high}</li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
-                    ))
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
-                    Data belum tersedia. Silakan isi riwayat pengalaman Anda.
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center-imp text-center w-full">
+                    Data belum terdeteksi dari input.
                   </p>
                 )}
               </div>
@@ -268,28 +336,24 @@ export default function LinkedinResults({
             {/* Education Left */}
             {activeTabSection === "education" && (
               <div className="space-y-3 animate-fade-in text-zinc-300">
-                {cv.improvements?.filter(i => {
-                  const s = (i.section || "").toLowerCase();
-                  return s.includes("pendidikan") || s.includes("education") || s.includes("akad") || s.includes("kuliah");
-                }).length > 0 ? (
-                  cv.improvements
-                    ?.filter(i => {
-                      const s = (i.section || "").toLowerCase();
-                      return s.includes("pendidikan") || s.includes("education") || s.includes("akad") || s.includes("kuliah");
-                    })
-                    .map((imp, idx) => (
-                      <div key={idx} className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
-                        <span className="text-[8px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded font-mono block w-max uppercase mb-1 font-bold">
-                          {imp.section || "Pendidikan"}
-                        </span>
-                        <p className="text-xs font-mono text-zinc-300 leading-relaxed italic">
-                          "{imp.before || "Data akademis sebelum tersedia"}"
-                        </p>
+                {parsedLinkedinResult.education && parsedLinkedinResult.education.length > 0 ? (
+                  <div className="space-y-3">
+                    {parsedLinkedinResult.education.map((edu, idx) => (
+                      <div key={idx} className="p-4 bg-[#030712] rounded-xl border border-white/[0.03] space-y-1">
+                        <div className="flex justify-between items-start">
+                          <h5 className="text-xs font-bold font-mono text-cyan-400">{edu.institution}</h5>
+                          <span className="text-[9px] font-mono text-zinc-500">{edu.period}</span>
+                        </div>
+                        <p className="text-[10px] font-mono text-zinc-300">{edu.major}</p>
+                        {edu.gpa && (
+                          <p className="text-[10px] font-mono text-zinc-400 font-semibold">IPK: {edu.gpa}</p>
+                        )}
                       </div>
-                    ))
+                    ))}
+                  </div>
                 ) : (
-                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center font-bold">
-                    Data belum tersedia. Silakan lampirkan tingkat pendidikan Anda.
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center-imp text-center w-full">
+                    Data belum terdeteksi dari input.
                   </p>
                 )}
               </div>
@@ -298,40 +362,60 @@ export default function LinkedinResults({
             {/* Skills Left */}
             {activeTabSection === "skills" && (
               <div className="space-y-4 animate-fade-in text-zinc-300">
-                <span className="text-[10px] font-mono text-zinc-500 block font-bold uppercase">DAFTAR KEAHLIAN TERSEDIA (CV):</span>
-                {skillsToRender.length > 0 ? (
+                {parsedLinkedinResult.skills && parsedLinkedinResult.skills.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {skillsToRender.map((skText, idx) => (
-                      <span key={idx} className="text-[10px] bg-zinc-800 text-zinc-350 border border-white/[0.04] px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full"></span>
-                        {skText}
+                    {parsedLinkedinResult.skills.map((skill, idx) => (
+                      <span key={idx} className="text-[10px] bg-[#030712] text-zinc-300 border border-white/[0.04] px-2.5 py-1.5 rounded font-mono font-medium flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 bg-cyan-400 rounded-full"></span>
+                        {skill}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center">
-                    Data belum tersedia di CV.
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center w-full">
+                    Data belum terdeteksi dari input.
                   </p>
                 )}
               </div>
             )}
 
-            {/* Summary Left */}
-            {activeTabSection === "summary" && (
+            {/* Certifications Left */}
+            {activeTabSection === "certifications" && (
               <div className="space-y-4 animate-fade-in text-zinc-300">
-                <div className="space-y-2">
-                  <span className="text-[9px] font-mono text-zinc-500 block font-bold uppercase">Headline Profil LinkedIn Asli:</span>
-                  <div className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] text-xs font-mono leading-relaxed text-zinc-400">
-                    {originalHeadline || "Headline belum ditentukan di setelan awal."}
+                {parsedLinkedinResult.certifications && parsedLinkedinResult.certifications.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {parsedLinkedinResult.certifications.map((cert, idx) => (
+                      <span key={idx} className="text-[10px] bg-[#030712] text-zinc-300 border border-white/[0.04] px-2.5 py-1.5 rounded font-mono font-medium flex items-center gap-1.5">
+                        <Award className="w-3 h-3 text-cyan-400 animate-pulse" />
+                        {cert}
+                      </span>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
 
-                <div className="space-y-2">
-                  <span className="text-[9px] font-mono text-zinc-500 block font-bold uppercase">Seksi About Me Asli:</span>
-                  <div className="p-3.5 bg-[#030712] rounded-xl border border-white/[0.03] text-xs font-mono leading-relaxed text-zinc-400 whitespace-pre-wrap">
-                    {originalSummary || "Draf About me asli belum dituliskan."}
+            {/* Projects Left */}
+            {activeTabSection === "projects" && (
+              <div className="space-y-4 animate-fade-in text-zinc-300">
+                {parsedLinkedinResult.projects && parsedLinkedinResult.projects.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {parsedLinkedinResult.projects.map((proj, idx) => (
+                      <span key={idx} className="text-[10px] bg-[#030712] text-zinc-300 border border-white/[0.04] px-2.5 py-1.5 rounded font-mono font-medium flex items-center gap-1.5">
+                        <FileText className="w-3 h-3 text-cyan-400" />
+                        {proj}
+                      </span>
+                    ))}
                   </div>
-                </div>
+                ) : (
+                  <p className="text-xs text-amber-500 italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.03] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
               </div>
             )}
             
@@ -343,7 +427,7 @@ export default function LinkedinResults({
           <div className="flex items-center justify-between border-b border-white/[0.03] pb-3">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span className="text-[10px] font-mono text-zinc-400 font-extrabold uppercase tracking-widest text-[#10B981]">
+              <span className="text-[10px] font-mono font-extrabold uppercase tracking-widest text-[#10B981]">
                 OPTIMIZED VERSION
               </span>
             </div>
@@ -355,10 +439,76 @@ export default function LinkedinResults({
           </div>
 
           <div className="min-h-[220px]">
+            {/* Headline Right Section */}
+            {activeTabSection === "headline" && (
+              <div className="space-y-3.5 animate-fade-in">
+                {opt?.headline_recommendations && opt.headline_recommendations.length > 0 ? (
+                  <div className="space-y-3.5">
+                    {opt.headline_recommendations.map((headline, idx) => (
+                      <div key={idx} className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] flex justify-between items-center gap-4 transition-all hover:border-emerald-500/10">
+                        <div className="flex-1 space-y-1">
+                          <span className="text-[8px] font-mono text-emerald-400 block font-bold">PILIHAN HERO #{idx + 1}</span>
+                          <p className="text-xs font-mono text-white leading-normal pr-2">
+                            "{headline}"
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => copyToClipboard(headline, `headline_copy_${idx}`)}
+                          className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0"
+                        >
+                          {copiedText === `headline_copy_${idx}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 text-xs italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.04] text-center">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* About Right Section */}
+            {activeTabSection === "about" && (
+              <div className="space-y-5 animate-fade-in">
+                {opt?.summary_after ? (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono text-zinc-400 block font-bold uppercase">Draf Deskripsi Ringkas (About):</span>
+                      <button
+                        onClick={() => copyToClipboard(opt.summary_after || "", "summary_after_copy")}
+                        className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        {copiedText === "summary_after_copy" ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-500" />
+                            <span>Selesai Disalin</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>Salin Semua</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <div className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] border-l-2 border-emerald-500/40 text-xs leading-relaxed text-zinc-200 font-mono whitespace-pre-wrap">
+                      {opt.summary_after}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-zinc-500 text-xs italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.04] text-center">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Experience Right Section */}
             {activeTabSection === "experience" && (
               <div className="space-y-4 animate-fade-in text-zinc-100">
-                {opt?.experience_recommendations && opt.experience_recommendations.length > 0 ? (
+                {opt?.experience_recommendations && opt.experience_recommendations.length > 0 && opt.experience_recommendations[0] !== "Data belum terdeteksi dari input." && parsedLinkedinResult.experience.length > 0 ? (
                   opt.experience_recommendations.map((bullet, idx) => (
                     <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
                       <div className="flex justify-between items-start gap-4">
@@ -390,8 +540,8 @@ export default function LinkedinResults({
                     </div>
                   ))
                 ) : (
-                  <p className="text-zinc-550 text-xs italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.04] text-center">
-                    Data belum tersedia untuk dioptimalkan.
+                  <p className="text-zinc-500 text-xs italic font-mono p-4 bg-[#030712] rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
                   </p>
                 )}
               </div>
@@ -400,7 +550,7 @@ export default function LinkedinResults({
             {/* Education Right Section */}
             {activeTabSection === "education" && (
               <div className="space-y-4 animate-fade-in">
-                {opt?.education_recommendations && opt.education_recommendations.length > 0 ? (
+                {opt?.education_recommendations && opt.education_recommendations.length > 0 && opt.education_recommendations[0] !== "Data belum terdeteksi dari input." && parsedLinkedinResult.education.length > 0 ? (
                   opt.education_recommendations.map((eduText, idx) => (
                     <div key={idx} className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] hover:border-emerald-500/15 transition-all block space-y-3">
                       <div className="flex justify-between items-start gap-4">
@@ -414,7 +564,7 @@ export default function LinkedinResults({
                         >
                           {copiedText === `edu_copy_${idx}` ? (
                             <>
-                              <Check className="w-3 h-3 text-emerald-505" />
+                              <Check className="w-3 h-3 text-emerald-500" />
                               <span className="text-zinc-500 font-semibold">Disalin</span>
                             </>
                           ) : (
@@ -432,8 +582,8 @@ export default function LinkedinResults({
                     </div>
                   ))
                 ) : (
-                  <p className="p-4 bg-[#030712] text-xs text-zinc-500 italic font-mono rounded-xl border border-white/[0.04] text-center">
-                    Data belum tersedia untuk dioptimalkan.
+                  <p className="p-4 bg-[#030712] text-xs text-zinc-500 italic font-mono rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
                   </p>
                 )}
               </div>
@@ -442,79 +592,76 @@ export default function LinkedinResults({
             {/* Skills Right Section */}
             {activeTabSection === "skills" && (
               <div className="space-y-4 animate-fade-in text-zinc-100">
-                <span className="text-[10px] font-mono text-zinc-400 block font-bold uppercase">REKOMENDASI PENULISAN KEAHLIAN LINKEDIN:</span>
-                <div className="p-4.5 bg-[#030712] rounded-xl border border-white/[0.03] space-y-3.5 font-mono text-xs">
-                  <div>
-                    <span className="text-emerald-400 block font-bold text-[10px] uppercase mb-1">• Kelompok Keahlian Utama (Sesuai CV):</span>
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {skillsToRender.length > 0 ? (
-                        skillsToRender.map((skText, idx) => (
-                          <span key={idx} className="text-[10px] bg-zinc-800 text-zinc-200 px-2 py-0.5 rounded font-mono border border-white/[0.02]">
-                            {skText}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-zinc-500 italic">Data belum tersedia</span>
-                      )}
+                {parsedLinkedinResult.skills && parsedLinkedinResult.skills.length > 0 ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Rekomendasi kata kunci optimasi & pengelompokkan skill LinkedIn yang selaras untuk meningkatkan pencocokan filter rekruter pada peran target <strong className="text-emerald-400">{linkedinTargetRole}</strong>:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {parsedLinkedinResult.skills.map((skText, idx) => (
+                        <span key={idx} className="text-[10px] bg-emerald-500/10 border border-emerald-500/20 text-[#10B981] px-2.5 py-1 rounded font-mono font-semibold flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                          {skText}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <p className="p-4 bg-[#030712] text-xs text-zinc-550 italic font-mono rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
               </div>
             )}
 
-            {/* Summary Right Section */}
-            {activeTabSection === "summary" && (
-              <div className="space-y-5 animate-fade-in">
-                {/* Headline Segment */}
-                {opt?.headline_recommendations && opt.headline_recommendations.length > 0 && (
-                  <div className="space-y-3.5">
-                    <span className="text-[10px] font-mono text-zinc-400 block font-bold uppercase">Opsi Headline LinkedIn CTR Tinggi (SEO):</span>
-                    {opt.headline_recommendations.slice(0, 2).map((headline, idx) => (
-                      <div key={idx} className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] flex justify-between items-center gap-4 transition-all hover:border-emerald-500/10">
-                        <div className="flex-1 space-y-1">
-                          <span className="text-[8px] font-mono text-emerald-400 block font-bold font-mono">PILIHAN HERO #{idx + 1}</span>
-                          <p className="text-xs font-mono text-white leading-normal pr-2">
-                            "{headline}"
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => copyToClipboard(headline, `headline_copy_${idx}`)}
-                          className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shrink-0"
-                        >
-                          {copiedText === `headline_copy_${idx}` ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                        </button>
-                      </div>
-                    ))}
+            {/* Certifications Right Section */}
+            {activeTabSection === "certifications" && (
+              <div className="space-y-4 animate-fade-in text-zinc-100">
+                {parsedLinkedinResult.certifications && parsedLinkedinResult.certifications.length > 0 ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-[#10B981] font-semibold leading-normal flex items-center gap-1.5 uppercase tracking-wide">
+                      <Check className="w-3.5 h-3.5" /> Sertifikasi Anda Terasosiasi Sukses!
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {parsedLinkedinResult.certifications.map((cert, idx) => (
+                        <span key={idx} className="text-[10px] bg-emerald-500/10 text-emerald-300 border border-emerald-500/15 px-2.5 py-1.5 rounded font-mono font-semibold flex items-center gap-1.5">
+                          <CheckCircle className="w-3 h-3 text-emerald-450" />
+                          {cert}
+                        </span>
+                      ))}
+                    </div>
                   </div>
+                ) : (
+                  <p className="p-4 bg-[#030712] text-xs text-zinc-550 italic font-mono rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
                 )}
+              </div>
+            )}
 
-                {/* About me Summary */}
-                <div className="space-y-3 pt-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-mono text-zinc-400 block font-bold uppercase">Draf Deskripsi Ringkas (About):</span>
-                    {opt?.summary_after && (
-                      <button
-                        onClick={() => copyToClipboard(opt.summary_after || "", "summary_after_copy")}
-                        className="bg-white hover:bg-zinc-200 text-[#030712] px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                      >
-                        {copiedText === "summary_after_copy" ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-500" />
-                            <span>Selesai Disalin</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Salin Semua</span>
-                          </>
-                        )}
-                      </button>
-                    )}
+            {/* Projects Right Section */}
+            {activeTabSection === "projects" && (
+              <div className="space-y-4 animate-fade-in text-zinc-100">
+                {parsedLinkedinResult.projects && parsedLinkedinResult.projects.length > 0 ? (
+                  <div className="bg-[#030712] p-4 rounded-xl border border-white/[0.03] space-y-3">
+                    <p className="text-[10px] font-mono text-zinc-400 leading-normal">
+                      Rekomendasi taktik memajang proyek portofolio Anda di bagian Project LinkedIn agar menarik rekruter:
+                    </p>
+                    <div className="space-y-2">
+                      {parsedLinkedinResult.projects.map((proj, idx) => (
+                        <div key={idx} className="p-2 bg-zinc-900 border border-white/[0.02] rounded text-[11px] font-mono text-zinc-350 flex items-start gap-1 justify-between">
+                          <div className="flex-1">
+                            • <strong className="text-emerald-400">{proj}</strong>: Jabarkan tech stack dan tunjukkan link fungsional/GitHub live.
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-[#030712] p-4.5 rounded-xl border border-white/[0.03] border-l-2 border-emerald-500/40 text-xs leading-relaxed text-zinc-200 font-mono whitespace-pre-wrap">
-                    {opt?.summary_after || "Data belum tersedia untuk dioptimalkan."}
-                  </div>
-                </div>
+                ) : (
+                  <p className="p-4 bg-[#030712] text-xs text-zinc-550 italic font-mono rounded-xl border border-white/[0.04] text-center w-full">
+                    Data belum terdeteksi dari input.
+                  </p>
+                )}
               </div>
             )}
             
@@ -560,7 +707,7 @@ export default function LinkedinResults({
             onClick={() => setActiveTab("cv-auditor")}
             className="flex-1 md:flex-none py-3 px-6 bg-[#030712] hover:bg-zinc-900 border border-white/[0.04] hover:border-white/[0.08] text-zinc-300 font-bold rounded-lg cursor-pointer transition-all uppercase tracking-wide flex items-center justify-center"
           >
-            Kembali ke CV Auditor
+            Kembali ke CV ATS Auditor
           </button>
           <button 
             onClick={() => {

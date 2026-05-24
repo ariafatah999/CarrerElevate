@@ -4,6 +4,7 @@ import { EXAMPLES } from "./data/examples";
 import { AnalysisResponse, AnalysisHistoryItem } from "./types";
 import { PREDEFINED_JOBS } from "./data/jobs";
 import { ParsedCvResultData } from "./components/CvValidationScreen";
+import { ParsedLinkedinResultData } from "./components/LinkedinValidationScreen";
 
 // Modular Sub-Components
 import Sidebar from "./components/Sidebar";
@@ -103,6 +104,11 @@ export default function App() {
   const [linkedinPdfFileName, setLinkedinPdfFileName] = useState<string | null>(null);
   const [isParsingLinkedinPdf, setIsParsingLinkedinPdf] = useState(false);
   const [linkedinProfileText, setLinkedinProfileText] = useState("");
+
+  // Flow baru states
+  const [parsedLinkedinResult, setParsedLinkedinResult] = useState<ParsedLinkedinResultData | null>(null);
+  const [linkedinParsingStage, setLinkedinParsingStage] = useState<"input" | "validation" | "results">("input");
+  const [loadingLinkedinOptimize, setLoadingLinkedinOptimize] = useState(false);
 
   // Load history from localStorage
   useEffect(() => {
@@ -343,8 +349,8 @@ export default function App() {
     }
   };
 
-  // LinkedIn branding optimization handler
-  const triggerLinkedinOptimization = async () => {
+  // Step 1/2/3: Parse & Extract Semantic LinkedIn Profile information
+  const triggerLinkedinParser = async () => {
     if (!linkedinProfileText.trim() && !linkedinHeadlineLama.trim() && !linkedinSummaryLama.trim()) {
       setLinkedinErrorMessage("Silakan unggah dokumen PDF LinkedIn Anda atau isi kolom manual.");
       return;
@@ -353,7 +359,7 @@ export default function App() {
     setLinkedinLoading(true);
 
     try {
-      const response = await fetch("/api/optimize-linkedin", {
+      const response = await fetch("/api/parse-linkedin", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -362,13 +368,46 @@ export default function App() {
           headlineLama: linkedinHeadlineLama,
           summaryLama: linkedinSummaryLama,
           profileText: linkedinProfileText,
+          targetRole: linkedinTargetRole
+        })
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal mengurai profil LinkedIn dengan AI.");
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      setParsedLinkedinResult(result);
+      setLinkedinParsingStage("validation");
+    } catch (err: any) {
+      console.error(err);
+      setLinkedinErrorMessage(err.message || "Gagal menghubungi server untuk mendeteksi profil LinkedIn.");
+    } finally {
+      setLinkedinLoading(false);
+    }
+  };
+
+  // Step 5: Optimize LinkedIn based on Validated semantic data
+  const triggerLinkedinOptimize = async (payload: ParsedLinkedinResultData) => {
+    setLinkedinErrorMessage(null);
+    setLoadingLinkedinOptimize(true);
+
+    try {
+      const response = await fetch("/api/optimize-linkedin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          parsedData: payload,
           tone: linkedinTone,
           targetRole: linkedinTargetRole
         })
       });
 
       if (!response.ok) {
-        const errorMsg = await safeGetErrorMessage(response, "Gagal mengoptimasi profil LinkedIn dengan AI.");
+        const errorMsg = await safeGetErrorMessage(response, "Gagal mengoptimasi LinkedIn berdasarkan data tervalidasi.");
         throw new Error(errorMsg);
       }
 
@@ -377,15 +416,15 @@ export default function App() {
       // Update active analysis with the newly returned LinkedIn optimizations
       setActiveAnalysis((prev) => {
         const fallbackCv = prev?.cv_analysis || {
-          ats_score: 82,
-          keyword_gap: ["React JS", "TypeScript", "Tailwind CSS"],
+          ats_score: 85,
+          keyword_gap: payload.skills.slice(0, 4),
           improvements: [
             {
-              section: "Pengalaman Kerja / Organisasi",
-              main_issue: "Bahasa terlalu pasif, kurang menggambarkan kontribusi teknis khusus, dan tidak memiliki bukti metrik angka pencapaian.",
-              before: "Bekerja membuat module landing page BEM.",
-              after: "Merekayasa modular landing page responsive untuk BEM Kampus dengan React JS sehingga loading aset 30% lebih kencang.",
-              reason: "Formula XYZ: Berbasis metrik konkrit, detail tech stack, dan kata kerja aktif."
+              section: "Pengalaman & Profil Utama",
+              main_issue: "Headline lama kurang merepresentasikan kekuatan teknis.",
+              before: payload.current_headline,
+              after: result.headline_recommendations[0],
+              reason: "Persona profesional berbasis SEO dan CTR modern."
             }
           ]
         };
@@ -395,15 +434,13 @@ export default function App() {
         };
       });
 
-      setActiveAnalysisMetadata((prev) => {
-        return prev || { jobTitle: linkedinTargetRole, companyName: "LinkedIn Profile" };
-      });
-
+      setActiveAnalysisMetadata({ jobTitle: linkedinTargetRole, companyName: "LinkedIn Optimizer" });
+      setLinkedinParsingStage("results");
     } catch (err: any) {
       console.error(err);
-      setLinkedinErrorMessage(err.message || "Gagal menghubungi server untuk optimasi LinkedIn.");
+      setLinkedinErrorMessage(err.message || "Gagal menghubungi server untuk optimasi akhir LinkedIn.");
     } finally {
-      setLinkedinLoading(false);
+      setLoadingLinkedinOptimize(false);
     }
   };
 
@@ -524,7 +561,15 @@ export default function App() {
                     setIsParsingLinkedinPdf={setIsParsingLinkedinPdf}
                     setLinkedinProfileText={setLinkedinProfileText}
                     handleLinkedinPdfUpload={handleLinkedinPdfUpload}
-                    triggerLinkedinOptimization={triggerLinkedinOptimization}
+                    triggerLinkedinParser={triggerLinkedinParser}
+
+                    parsedLinkedinResult={parsedLinkedinResult}
+                    setParsedLinkedinResult={setParsedLinkedinResult}
+                    linkedinParsingStage={linkedinParsingStage}
+                    setLinkedinParsingStage={setLinkedinParsingStage}
+                    triggerLinkedinOptimize={triggerLinkedinOptimize}
+                    loadingLinkedinOptimize={loadingLinkedinOptimize}
+
                     copyToClipboard={copyToClipboard}
                     copiedText={copiedText}
                   />
