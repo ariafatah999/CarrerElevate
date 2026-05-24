@@ -1,0 +1,484 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
+import { EXAMPLES } from "./data/examples";
+import { AnalysisResponse, AnalysisHistoryItem } from "./types";
+import { PREDEFINED_JOBS } from "./data/jobs";
+
+// Modular Sub-Components
+import Sidebar from "./components/Sidebar";
+import Header from "./components/Header";
+
+// Lazy-Loaded Page Containers
+const CvAuditorPage = React.lazy(() => import("./pages/CvAuditorPage"));
+const LinkedinPage = React.lazy(() => import("./pages/LinkedinPage"));
+const HistoryPage = React.lazy(() => import("./pages/HistoryPage"));
+
+export default function App() {
+  // Input states
+  const [cvText, setCvText] = useState("");
+  const [jobDescription, setJobDescription] = useState("");
+  const [selectedExampleIndex, setSelectedExampleIndex] = useState<number | null>(null);
+  
+  // Job Target states
+  const [selectedJobId, setSelectedJobId] = useState<string>("frontend");
+  const [customJobTitle, setCustomJobTitle] = useState<string>("");
+
+  // Sync JD state internally based on job target
+  useEffect(() => {
+    if (selectedJobId === "custom") {
+      const title = customJobTitle.trim() || "Spesialis IT";
+      setJobDescription(
+        `Mengemban peran profesional penuh sebagai ${title}.\n` +
+        `Bertanggung jawab merancang rancangan teknis berkualitas sesuai standar spesifikasi, memecahkan masalah (debugging), mengoptimalkan performa operational harian, kolaborasi erat dengan jajaran anggota tim internal, serta memastikan standar kualitas tinggi tercapai.`
+      );
+    } else {
+      const matched = PREDEFINED_JOBS.find(j => j.id === selectedJobId);
+      if (matched) {
+        setJobDescription(matched.description);
+      }
+    }
+  }, [selectedJobId, customJobTitle]);
+
+  // App UI states (Derived dynamically from route URLs)
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const activeTab = location.pathname.startsWith("/linkedin")
+    ? "linkedin"
+    : location.pathname.startsWith("/history")
+    ? "history"
+    : "cv-auditor";
+
+  const setActiveTab = (tab: "cv-auditor" | "linkedin" | "history") => {
+    if (tab === "linkedin") {
+      navigate("/linkedin-optimizer");
+    } else if (tab === "history") {
+      navigate("/history");
+    } else {
+      navigate("/cv-ats-auditor");
+    }
+  };
+
+  const [history, setHistory] = useState<AnalysisHistoryItem[]>([]);
+  const [activeAnalysis, setActiveAnalysis] = useState<AnalysisResponse | null>(null);
+  const [activeAnalysisMetadata, setActiveAnalysisMetadata] = useState<{ jobTitle: string; companyName: string } | null>(null);
+
+  // Loading & error states
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Utility copy state
+  const [copiedText, setCopiedText] = useState<string | null>(null);
+
+  // Extra input states for PDF file simulation
+  const [isParsingPdf, setIsParsingPdf] = useState(false);
+  const [pdfFileName, setPdfFileName] = useState<string | null>(null);
+
+  // LinkedIn branding optimizer states
+  const [linkedinHeadlineLama, setLinkedinHeadlineLama] = useState("");
+  const [linkedinSummaryLama, setLinkedinSummaryLama] = useState("");
+  const [linkedinTone, setLinkedinTone] = useState("Professional");
+  const [linkedinTargetRole, setLinkedinTargetRole] = useState("Junior Web Developer");
+  const [linkedinLoading, setLinkedinLoading] = useState(false);
+  const [linkedinErrorMessage, setLinkedinErrorMessage] = useState<string | null>(null);
+
+  // LinkedIn PDF optimizer states
+  const [linkedinPdfFileName, setLinkedinPdfFileName] = useState<string | null>(null);
+  const [isParsingLinkedinPdf, setIsParsingLinkedinPdf] = useState(false);
+  const [linkedinProfileText, setLinkedinProfileText] = useState("");
+
+  // Load history from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("career_elevate_history");
+      if (stored) {
+        setHistory(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error("Failed to load search history", e);
+    }
+  }, []);
+
+  // Save history helper
+  const saveToHistory = (data: AnalysisResponse, rawJobDesc: string) => {
+    try {
+      let jobTitle = "Spesialis IT";
+      let companyName = "Grup Perusahaan Target";
+
+      if (selectedJobId === "custom") {
+        jobTitle = customJobTitle.trim() || "Posisi Custom IT";
+        companyName = "Sektor Kustom";
+      } else {
+        const matched = PREDEFINED_JOBS.find(j => j.id === selectedJobId);
+        if (matched) {
+          jobTitle = matched.title;
+          companyName = matched.category;
+        }
+      }
+
+      const newItem: AnalysisHistoryItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
+        jobTitle,
+        companyName,
+        ats_score: data.cv_analysis.ats_score,
+        data
+      };
+
+      const updatedHistory = [newItem, ...history];
+      setHistory(updatedHistory);
+      localStorage.setItem("career_elevate_history", JSON.stringify(updatedHistory));
+      setActiveAnalysisMetadata({ jobTitle, companyName });
+    } catch (e) {
+      console.error("Failed to save item to history", e);
+    }
+  };
+
+  // Safe error extraction from HTTP response
+  const safeGetErrorMessage = async (response: Response, defaultMsg: string): Promise<string> => {
+    try {
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        return data.error || defaultMsg;
+      } else {
+        const text = await response.text();
+        return text.substring(0, 150) || `${response.status} ${response.statusText}`;
+      }
+    } catch {
+      return `${response.status} ${response.statusText}`;
+    }
+  };
+
+  // Main audit trigger
+  const triggerAudit = async () => {
+    if (!cvText.trim()) {
+      setErrorMessage("Silakan masukkan teks CV Anda terlebih dahulu.");
+      return;
+    }
+    if (!jobDescription.trim()) {
+      setErrorMessage("Silakan masukkan teks Job Description terlebih dahulu.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cvText, jobDescription }),
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal melakukan analisis. Pastikan GEMINI_API_KEY Anda valid.");
+        throw new Error(errorMsg);
+      }
+
+      const result: AnalysisResponse = await response.json();
+      setActiveAnalysis(result);
+      saveToHistory(result, jobDescription);
+      
+      // Auto switch to CV Auditor Detail Tab
+      setActiveTab("cv-auditor");
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.message || "Koneksi ke backend server gagal. Periksa log server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // PDF Loading Real Parser Handler
+  const handlePdfUpload = async (file: File) => {
+    if (!file) return;
+    setIsParsingPdf(true);
+    setPdfFileName(file.name);
+    setErrorMessage(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append("pdf", file);
+
+      const response = await fetch("/api/parse-pdf", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal memproses unggahan berkas.");
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      if (result.warning) {
+        setErrorMessage(result.warning);
+      }
+      
+      setCvText(result.text || "");
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(`Gagal mendeteksi teks PDF Anda secara otomatis: ${err.message}.`);
+    } finally {
+      setIsParsingPdf(false);
+    }
+  };
+
+  // Helper for quick trial testing
+  const handleInjectSampleCv = () => {
+    setCvText(EXAMPLES[0].cvText);
+    setPdfFileName("CV_Contoh_Budi_Santoso.pdf");
+    setErrorMessage(null);
+  };
+
+  // LinkedIn PDF Loader Handler
+  const handleLinkedinPdfUpload = async (file: File) => {
+    if (!file) return;
+    setIsParsingLinkedinPdf(true);
+    setLinkedinPdfFileName(file.name);
+    setLinkedinErrorMessage(null);
+    
+    try {
+      const formData = new FormData();
+      formData.append("pdf", file);
+
+      const response = await fetch("/api/parse-pdf", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal memproses unggah berkas PDF LinkedIn.");
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+      if (result.warning) {
+        setLinkedinErrorMessage(result.warning);
+      }
+      
+      setLinkedinProfileText(result.text || "");
+    } catch (err: any) {
+      console.error(err);
+      setLinkedinErrorMessage(`Gagal mengekstrak teks PDF LinkedIn: ${err.message}. Silakan isi atau edit data manual di kolom bawah.`);
+    } finally {
+      setIsParsingLinkedinPdf(false);
+    }
+  };
+
+  // LinkedIn branding optimization handler
+  const triggerLinkedinOptimization = async () => {
+    if (!linkedinProfileText.trim() && !linkedinHeadlineLama.trim() && !linkedinSummaryLama.trim()) {
+      setLinkedinErrorMessage("Silakan unggah dokumen PDF LinkedIn Anda atau isi kolom manual.");
+      return;
+    }
+    setLinkedinErrorMessage(null);
+    setLinkedinLoading(true);
+
+    try {
+      const response = await fetch("/api/optimize-linkedin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          headlineLama: linkedinHeadlineLama,
+          summaryLama: linkedinSummaryLama,
+          profileText: linkedinProfileText,
+          tone: linkedinTone,
+          targetRole: linkedinTargetRole
+        })
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal mengoptimasi profil LinkedIn dengan AI.");
+        throw new Error(errorMsg);
+      }
+
+      const result = await response.json();
+
+      // Update active analysis with the newly returned LinkedIn optimizations
+      setActiveAnalysis((prev) => {
+        const fallbackCv = prev?.cv_analysis || {
+          ats_score: 82,
+          keyword_gap: ["React JS", "TypeScript", "Tailwind CSS"],
+          improvements: [
+            {
+              section: "Pengalaman Kerja / Organisasi",
+              main_issue: "Bahasa terlalu pasif, kurang menggambarkan kontribusi teknis khusus, dan tidak memiliki bukti metrik angka pencapaian.",
+              before: "Bekerja membuat module landing page BEM.",
+              after: "Merekayasa modular landing page responsive untuk BEM Kampus dengan React JS sehingga loading aset 30% lebih kencang.",
+              reason: "Formula XYZ: Berbasis metrik konkrit, detail tech stack, dan kata kerja aktif."
+            }
+          ]
+        };
+        return {
+          cv_analysis: fallbackCv,
+          linkedin_optimization: result
+        };
+      });
+
+      setActiveAnalysisMetadata((prev) => {
+        return prev || { jobTitle: linkedinTargetRole, companyName: "LinkedIn Profile" };
+      });
+
+    } catch (err: any) {
+      console.error(err);
+      setLinkedinErrorMessage(err.message || "Gagal menghubungi server untuk optimasi LinkedIn.");
+    } finally {
+      setLinkedinLoading(false);
+    }
+  };
+
+  // Delete item from history
+  const deleteHistoryItem = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const updated = history.filter(item => item.id !== id);
+    setHistory(updated);
+    localStorage.setItem("career_elevate_history", JSON.stringify(updated));
+    if (activeAnalysis && history.find(h => h.id === id)?.data === activeAnalysis) {
+      setActiveAnalysis(null);
+      setActiveAnalysisMetadata(null);
+    }
+  };
+
+  // Helper copy to clipboard
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(label);
+    setTimeout(() => {
+      setCopiedText(null);
+    }, 2000);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex font-sans">
+      
+      {/* 1. STICKY LEFT SIDEBAR */}
+      <Sidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        activeAnalysis={activeAnalysis}
+        history={history}
+      />
+
+      {/* 2. MAIN SCROLLABLE CONTENT BODY */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        
+        {/* Top Header Information Indicator */}
+        <Header activeAnalysisMetadata={activeAnalysisMetadata} />
+
+        {/* Dynamic Content Area based on Tab */}
+        <div className="p-8 max-w-5xl mx-auto w-full flex-1">
+          
+          <React.Suspense fallback={
+            <div className="flex flex-col items-center justify-center p-12 min-h-[400px]">
+              <div className="w-10 h-10 border-4 border-t-cyan-500 border-slate-800 rounded-full animate-spin"></div>
+              <p className="mt-4 text-xs font-mono text-slate-405">Memuat komponen halaman...</p>
+            </div>
+          }>
+            <Routes>
+              {/* Fallback routes and redirects */}
+              <Route path="/" element={<Navigate replace to="/cv-ats-auditor" />} />
+              <Route path="/cv-auditor" element={<Navigate replace to="/cv-ats-auditor" />} />
+              <Route path="/linkedin" element={<Navigate replace to="/linkedin-optimizer" />} />
+
+              {/* Core Feature Paths */}
+              <Route 
+                path="/cv-ats-auditor" 
+                element={
+                  <CvAuditorPage
+                    loading={loading}
+                    activeAnalysis={activeAnalysis}
+                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveTab={setActiveTab}
+                    copyToClipboard={copyToClipboard}
+                    copiedText={copiedText}
+                    cvText={cvText}
+                    setCvText={setCvText}
+                    jobDescription={jobDescription}
+                    setJobDescription={setJobDescription}
+                    selectedJobId={selectedJobId}
+                    setSelectedJobId={setSelectedJobId}
+                    customJobTitle={customJobTitle}
+                    setCustomJobTitle={setCustomJobTitle}
+                    errorMessage={errorMessage}
+                    setErrorMessage={setErrorMessage}
+                    pdfFileName={pdfFileName}
+                    setPdfFileName={setPdfFileName}
+                    isParsingPdf={isParsingPdf}
+                    setIsParsingPdf={setIsParsingPdf}
+                    handlePdfUpload={handlePdfUpload}
+                    handleInjectSampleCv={handleInjectSampleCv}
+                    triggerAudit={triggerAudit}
+                    setLinkedinTargetRole={setLinkedinTargetRole}
+                  />
+                }
+              />
+
+              <Route 
+                path="/linkedin-optimizer" 
+                element={
+                  <LinkedinPage
+                    linkedinLoading={linkedinLoading}
+                    activeAnalysis={activeAnalysis}
+                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveTab={setActiveTab}
+                    linkedinHeadlineLama={linkedinHeadlineLama}
+                    setLinkedinHeadlineLama={setLinkedinHeadlineLama}
+                    linkedinSummaryLama={linkedinSummaryLama}
+                    setLinkedinSummaryLama={setLinkedinSummaryLama}
+                    linkedinTone={linkedinTone}
+                    setLinkedinTone={setLinkedinTone}
+                    linkedinTargetRole={linkedinTargetRole}
+                    setLinkedinTargetRole={setLinkedinTargetRole}
+                    linkedinErrorMessage={linkedinErrorMessage}
+                    setLinkedinErrorMessage={setLinkedinErrorMessage}
+                    linkedinPdfFileName={linkedinPdfFileName}
+                    setLinkedinPdfFileName={setLinkedinPdfFileName}
+                    isParsingLinkedinPdf={isParsingLinkedinPdf}
+                    setIsParsingLinkedinPdf={setIsParsingLinkedinPdf}
+                    setLinkedinProfileText={setLinkedinProfileText}
+                    handleLinkedinPdfUpload={handleLinkedinPdfUpload}
+                    triggerLinkedinOptimization={triggerLinkedinOptimization}
+                    copyToClipboard={copyToClipboard}
+                    copiedText={copiedText}
+                  />
+                }
+              />
+
+              <Route 
+                path="/history" 
+                element={
+                  <HistoryPage
+                    history={history}
+                    setActiveTab={setActiveTab}
+                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveAnalysisMetadata={setActiveAnalysisMetadata}
+                    deleteHistoryItem={deleteHistoryItem}
+                  />
+                }
+              />
+
+              {/* Automatic Wildcard redirection */}
+              <Route path="*" element={<Navigate replace to="/cv-ats-auditor" />} />
+            </Routes>
+          </React.Suspense>
+
+        </div>
+
+
+      </main>
+
+    </div>
+  );
+}

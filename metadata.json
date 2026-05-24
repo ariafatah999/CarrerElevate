@@ -1,0 +1,8 @@
+{
+  "name": "Remix: CareerElevate AI",
+  "description": "ATS CV Auditor \u0026 LinkedIn Profile Optimizer for IT and Web Development students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
