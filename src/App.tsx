@@ -316,11 +316,24 @@ export default function App() {
     setCvText("");
 
     try {
-      const response = await fetch("/samples/sample-cv.pdf");
-      if (!response.ok) {
+      // Try samples subfolder first, fallback to root
+      let response = await fetch("/samples/sample-cv.pdf");
+      let contentType = response.headers.get("content-type") || "";
+      
+      if (!response.ok || contentType.includes("text/html")) {
+        response = await fetch("/sample-cv.pdf");
+        contentType = response.headers.get("content-type") || "";
+      }
+
+      if (!response.ok || contentType.includes("text/html")) {
         throw new Error("File contoh belum tersedia. Tambahkan file PDF ke folder public/samples.");
       }
+
       const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error("File contoh terdeteksi kosong (0 bytes). Silakan pastikan file PDF contoh memiliki isi.");
+      }
+
       const file = new File([blob], "sample-cv.pdf", { type: "application/pdf" });
 
       const formData = new FormData();
@@ -344,8 +357,8 @@ export default function App() {
       setCvText(result.text || "");
     } catch (err: any) {
       console.error(err);
-      const displayMsg = err.message.includes("File contoh belum tersedia")
-        ? "File contoh belum tersedia. Tambahkan file PDF ke folder public/samples."
+      const displayMsg = err.message.includes("File contoh belum tersedia") || err.message.includes("terdeteksi kosong")
+        ? err.message
         : `Gagal memproses berkas contoh CV secara otomatis: ${err.message}.`;
       setErrorMessage(displayMsg);
       setPdfFileName(null);
@@ -362,11 +375,24 @@ export default function App() {
     setLinkedinProfileText("");
 
     try {
-      const response = await fetch("/samples/sample-linkedin.pdf");
-      if (!response.ok) {
+      // Try samples subfolder first, fallback to root
+      let response = await fetch("/samples/sample-linkedin.pdf");
+      let contentType = response.headers.get("content-type") || "";
+
+      if (!response.ok || contentType.includes("text/html")) {
+        response = await fetch("/sample-linkedin.pdf");
+        contentType = response.headers.get("content-type") || "";
+      }
+
+      if (!response.ok || contentType.includes("text/html")) {
         throw new Error("File contoh belum tersedia. Tambahkan file PDF ke folder public/samples.");
       }
+
       const blob = await response.blob();
+      if (blob.size === 0) {
+        throw new Error("File contoh terdeteksi kosong (0 bytes). Silakan pastikan file PDF contoh memiliki isi.");
+      }
+
       const file = new File([blob], "sample-linkedin.pdf", { type: "application/pdf" });
 
       const formData = new FormData();
@@ -390,8 +416,8 @@ export default function App() {
       setLinkedinProfileText(result.text || "");
     } catch (err: any) {
       console.error(err);
-      const displayMsg = err.message.includes("File contoh belum tersedia")
-        ? "File contoh belum tersedia. Tambahkan file PDF ke folder public/samples."
+      const displayMsg = err.message.includes("File contoh belum tersedia") || err.message.includes("terdeteksi kosong")
+        ? err.message
         : `Gagal mengekstrak teks PDF contoh LinkedIn: ${err.message}.`;
       setLinkedinErrorMessage(displayMsg);
       setLinkedinPdfFileName(null);
