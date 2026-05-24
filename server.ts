@@ -3,8 +3,6 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import multer from "multer";
-// @ts-ignore
-import pdf from "pdf-parse";
 
 dotenv.config();
 
@@ -357,7 +355,7 @@ Hasilkan pula 'experience_recommendations' berisi list rekomendasi penulisan / r
   }
 });
 
-// 3. Endpoint to extract text from actual PDF files using pdf-parse Node library
+// 3. Endpoint to extract text from actual PDF files using Gemini API (100% serverless compatible & OCR supportive)
 app.post("/api/parse-pdf", upload.single("pdf"), async (req, res) => {
   try {
     if (!req.file) {
@@ -366,12 +364,29 @@ app.post("/api/parse-pdf", upload.single("pdf"), async (req, res) => {
     }
 
     const dataBuffer = req.file.buffer;
-    // Extract text using pdf-parse library
-    const parsedData = await pdf(dataBuffer);
-    const extractedText = parsedData.text || "";
+    const ai = getGeminiClient();
+
+    // Prepare PDF as inline data for Gemini
+    const pdfPart = {
+      inlineData: {
+        mimeType: "application/pdf",
+        data: dataBuffer.toString("base64")
+      }
+    };
+
+    // Ask Gemini to extract text literally
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: [
+        pdfPart,
+        "Extract all plain text from this PDF file. Do not summarize, explain, or format. Preserve original information, words, spelling and structure as literal text, suitable for processing with our ATS scanner."
+      ]
+    });
+
+    const extractedText = response.text || "";
 
     if (!extractedText.trim()) {
-      res.json({ text: "", warning: "Tidak berhasil mengekstrak teks dari PDF. Cek apakah dokumen Anda berupa scan gambar." });
+      res.json({ text: "", warning: "Tidak berhasil mengekstrak teks dari PDF. Cek apakah berkas dokumen Anda kosong atau rusak." });
       return;
     }
 
