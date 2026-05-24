@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-
 import { EXAMPLES } from "./data/examples";
 import { AnalysisResponse, AnalysisHistoryItem } from "./types";
 import { PREDEFINED_JOBS } from "./data/jobs";
+import { ParsedCvResultData } from "./components/CvValidationScreen";
 
 // Modular Sub-Components
 import Sidebar from "./components/Sidebar";
@@ -66,6 +67,22 @@ export default function App() {
   // Loading & error states
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // CV Parsing, Validation stage, and Optimization loader states
+  const [parsedCvResult, setParsedCvResult] = useState<ParsedCvResultData | null>(null);
+  const [parsingStage, setParsingStage] = useState<"input" | "validation" | "results">("input");
+  const [loadingOptimize, setLoadingOptimize] = useState(false);
+
+  // Overriding active analysis setter to synchronise validation and result stages
+  const handleSetActiveAnalysis = (val: AnalysisResponse | null) => {
+    setActiveAnalysis(val);
+    if (val === null) {
+      setParsingStage("input");
+      setParsedCvResult(null);
+    } else {
+      setParsingStage("results");
+    }
+  };
 
   // Utility copy state
   const [copiedText, setCopiedText] = useState<string | null>(null);
@@ -156,7 +173,7 @@ export default function App() {
     }
   };
 
-  // Main audit trigger
+  // Main audit trigger (Step 1: Parse, Extract Semantic details, and Validate)
   const triggerAudit = async () => {
     if (!cvText.trim()) {
       setErrorMessage("Silakan masukkan teks CV Anda terlebih dahulu.");
@@ -171,7 +188,7 @@ export default function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/analyze", {
+      const response = await fetch("/api/parse-cv", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,21 +197,72 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const errorMsg = await safeGetErrorMessage(response, "Gagal melakukan analisis. Pastikan GEMINI_API_KEY Anda valid.");
+        const errorMsg = await safeGetErrorMessage(response, "Gagal melakukan ekstraksi data semantik CV. Pastikan GEMINI_API_KEY Anda valid.");
+        throw new Error(errorMsg);
+      }
+
+      const result: ParsedCvResultData = await response.json();
+      setParsedCvResult(result);
+      setParsingStage("validation");
+    } catch (err: any) {
+      console.error(err);
+      setErrorMessage(err.message || "Koneksi ke sistem parser gagal. Periksa log server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Optimization Step (Step 2: Core ATS Matcher + LinkedIn Branding using validated details)
+  const triggerOptimizeCv = async (payload: ParsedCvResultData) => {
+    if (!jobDescription.trim()) {
+      setErrorMessage("Silakan masukkan target deskripsi pekerjaan terlebih dahulu.");
+      return;
+    }
+
+    setErrorMessage(null);
+    setLoadingOptimize(true);
+
+    try {
+      const response = await fetch("/api/optimize-cv", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ parsedData: payload, jobDescription }),
+      });
+
+      if (!response.ok) {
+        const errorMsg = await safeGetErrorMessage(response, "Gagal menjalankan optimasi. Pastikan parameter aslinya valid.");
         throw new Error(errorMsg);
       }
 
       const result: AnalysisResponse = await response.json();
+
+      // Ensure the validated parsed data is synchronized back into the activeAnalysis so results page can render it
+      if (result.cv_analysis) {
+        result.cv_analysis.parsed_data = {
+          skills: payload.skills,
+          experience: payload.experience,
+          education: payload.education,
+          certifications: payload.certifications,
+          projects: payload.projects,
+          confidence_level: payload.confidence?.level || "Tinggi",
+          confidence_score: payload.confidence?.score || 90,
+          confidence_remarks: payload.confidence?.remarks || ""
+        };
+      }
+
       setActiveAnalysis(result);
       saveToHistory(result, jobDescription);
       
-      // Auto switch to CV Auditor Detail Tab
+      setParsingStage("results");
+      // Auto switch target tab focus
       setActiveTab("cv-auditor");
     } catch (err: any) {
       console.error(err);
-      setErrorMessage(err.message || "Koneksi ke backend server gagal. Periksa log server.");
+      setErrorMessage(err.message || "Koneksi ke backend optimizer gagal.");
     } finally {
-      setLoading(false);
+      setLoadingOptimize(false);
     }
   };
 
@@ -399,7 +467,7 @@ export default function App() {
                   <CvAuditorPage
                     loading={loading}
                     activeAnalysis={activeAnalysis}
-                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveAnalysis={handleSetActiveAnalysis}
                     setActiveTab={setActiveTab}
                     copyToClipboard={copyToClipboard}
                     copiedText={copiedText}
@@ -421,6 +489,13 @@ export default function App() {
                     handleInjectSampleCv={handleInjectSampleCv}
                     triggerAudit={triggerAudit}
                     setLinkedinTargetRole={setLinkedinTargetRole}
+
+                    parsedCvResult={parsedCvResult}
+                    setParsedCvResult={setParsedCvResult}
+                    parsingStage={parsingStage}
+                    setParsingStage={setParsingStage}
+                    triggerOptimizeCv={triggerOptimizeCv}
+                    loadingOptimize={loadingOptimize}
                   />
                 }
               />
@@ -431,7 +506,7 @@ export default function App() {
                   <LinkedinPage
                     linkedinLoading={linkedinLoading}
                     activeAnalysis={activeAnalysis}
-                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveAnalysis={handleSetActiveAnalysis}
                     setActiveTab={setActiveTab}
                     linkedinHeadlineLama={linkedinHeadlineLama}
                     setLinkedinHeadlineLama={setLinkedinHeadlineLama}
@@ -462,7 +537,7 @@ export default function App() {
                   <HistoryPage
                     history={history}
                     setActiveTab={setActiveTab}
-                    setActiveAnalysis={setActiveAnalysis}
+                    setActiveAnalysis={handleSetActiveAnalysis}
                     setActiveAnalysisMetadata={setActiveAnalysisMetadata}
                     deleteHistoryItem={deleteHistoryItem}
                   />

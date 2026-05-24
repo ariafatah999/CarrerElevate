@@ -2,6 +2,7 @@ import React from "react";
 import LoadingScreen from "../components/LoadingScreen";
 import CvAuditorInput from "../components/CvAuditorInput";
 import CvAuditorResults from "../components/CvAuditorResults";
+import CvValidationScreen, { ParsedCvResultData } from "../components/CvValidationScreen";
 import { AnalysisResponse } from "../types";
 
 interface CvAuditorPageProps {
@@ -29,6 +30,14 @@ interface CvAuditorPageProps {
   handleInjectSampleCv: () => void;
   triggerAudit: () => Promise<void>;
   setLinkedinTargetRole: (role: string) => void;
+
+  // New Validation and Parsed Data States
+  parsedCvResult: ParsedCvResultData | null;
+  setParsedCvResult: (data: ParsedCvResultData | null) => void;
+  parsingStage: "input" | "validation" | "results";
+  setParsingStage: (stage: "input" | "validation" | "results") => void;
+  triggerOptimizeCv: (payload: ParsedCvResultData) => Promise<void>;
+  loadingOptimize: boolean;
 }
 
 export default function CvAuditorPage({
@@ -55,13 +64,34 @@ export default function CvAuditorPage({
   handlePdfUpload,
   handleInjectSampleCv,
   triggerAudit,
-  setLinkedinTargetRole
+  setLinkedinTargetRole,
+
+  // New Validation Props
+  parsedCvResult,
+  setParsedCvResult,
+  parsingStage,
+  setParsingStage,
+  triggerOptimizeCv,
+  loadingOptimize
 }: CvAuditorPageProps) {
   if (loading) {
     return <LoadingScreen loading={loading} />;
   }
 
-  if (!activeAnalysis) {
+  // Display Validation Screen if parsed CV data exists and parsingStage is "validation"
+  if (parsingStage === "validation" && parsedCvResult) {
+    return (
+      <CvValidationScreen
+        parsedData={parsedCvResult}
+        onUpdate={setParsedCvResult}
+        onBack={() => setParsingStage("input")}
+        onSubmitOptimization={triggerOptimizeCv}
+        loadingOptimize={loadingOptimize}
+      />
+    );
+  }
+
+  if (!activeAnalysis || parsingStage === "input") {
     return (
       <CvAuditorInput
         cvText={cvText}
@@ -89,7 +119,13 @@ export default function CvAuditorPage({
   return (
     <CvAuditorResults
       activeAnalysis={activeAnalysis}
-      setActiveAnalysis={setActiveAnalysis}
+      setActiveAnalysis={(val) => {
+        setActiveAnalysis(val);
+        if (val === null) {
+          setParsingStage("input");
+          setParsedCvResult(null);
+        }
+      }}
       setActiveTab={setActiveTab}
       copyToClipboard={copyToClipboard}
       copiedText={copiedText}

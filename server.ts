@@ -259,6 +259,351 @@ Tolong lakukan audit CV, ekstraksi semantik (Parsed Data), dan kalkulasi ATS Mat
   }
 });
 
+// A. Endpoint for parsing & semantic extraction of CV + Fallback detection & Validation
+app.post("/api/parse-cv", async (req, res) => {
+  try {
+    const { cvText, jobDescription } = req.body;
+
+    if (!cvText || !cvText.trim()) {
+      res.status(400).json({ error: "Teks Curriculum Vitae (CV) wajib diisi." });
+      return;
+    }
+
+    const ai = getGeminiClient();
+
+    const systemInstruction = `Kamu adalah Real-time Semantic Parser, ATS Expert, Smart CV Analyzer, dan Ahli Data Profiling Karir di sistem "CareerElevate AI".
+Tugas utamamu adalah mengekstrak data dari teks CV kasar secara semantik (Semantic Parsing) dengan akurasi 105% dan mengelompokkannya ke dalam format JSON terstruktur.
+
+BERIKUT ADALAH ATURAN PARSING DAN DETEKSI SEMANTIK HARUS KAMU PATUHI:
+
+1. INTELLIGENT HEADING LOOKUP:
+   - Banyak CV tidak memakai judul bagian (heading) standar seperti "Education" atau "Pendidikan".
+   - Pindai variasi-variasi terdekat dari heading berikut:
+     * Pendidikan: Riwayat Pendidikan, Academic Background, Edukasi, Pendidikan Formal, Education History, Sekolah / Universitas, Degree / Major, Academic History, Latar Belakang Pendidikan.
+     * Pengalaman Kerja: Experience, Riwayat Kerja, Riwayat Karir, Employment, Work Experience, Professional History, Internship, Magang, Asisten, Pengalaman Organisasi, Proyek Kerja.
+     * Keahlian: Skills, Keahlian, Kompetensi, Keahlian Teknis, Core Competencies, Area of Expertise, Tech Stack, Spesialisasi.
+     * Sertifikasi: Certifications, Sertifikat, Lisensi, Licenses, Credentials, Training.
+     * Proyek: Projects, Portofolio, Karya, Proyek Personal, Project Portfolio.
+     * Prestasi: Achievements, Penghargaan, Awards, Prestasi Akademik, Honors.
+
+2. FALLBACK DETECTION JIKA HEADING TIDAK TERPECAH (COMPLEX RULE):
+   - Jika bagian "Education / Pendidikan" tidak ditemukan sebagai heading khusus, lakukan pencarian semantik terhadap pola baris di seluruh CV teks:
+     * Cari kata bersinggungan level studi: "S1", "S2", "S3", "D3", "SMK", "SMA", "Bachelor", "Diploma", "Vocational School", "Master", "Associate Degree".
+     * Cari nama-nama institusi, universitas, sekolah (contoh kata kunci: "Universitas", "STT", "Institut", "Sekolah", "Politeknik", "College", "Academy", "Nurul Fikri", "UI", "ITB", dsb).
+     * Cari nama jurusan atau konsentrasi (contoh: "Teknik Informatika", "Sistem Informasi", "Akuntansi", "Manajemen", dsb).
+     * Cari tahun (seperti "2020", "2024", "Lulus").
+     * CONTOH EKSTRAKSI: Jika ditemui teks "S1 Teknik Informatika - STT Terpadu Nurul Fikri (2020 - 2024)" maka ekstrak sebagai:
+       - institution: "STT Terpadu Nurul Fikri"
+       - degree: "S1"
+       - major: "Teknik Informatika"
+       - period: "2020 - 2024"
+       - gpa: "" (kosong jika tidak tertulis)
+
+3. STRUKTUR PERSONAL INFO LITERAL:
+   - Ekstrak nama kandidat ("candidate_name") secara literal dari baris-baris awal teks CV. Jangan dikarang. Jika benar-benar misterius atau tidak ditemukan, beri nilai "Kandidat".
+   - Kumpulkan email, kontak telepon, sosial media (Linkedin, Github, website) ke dalam array "candidate_socials".
+
+4. KETENTUAN MULTI-BAHASA & TYPO HANDLER:
+   - Pahami kalimat campuran (Indonesia-Inggris) draf aslinya.
+   - Bersihkan typo ringan dalam keywords/bahasa (cth: "reactjs" / "React JS" -> "React.js").
+
+5. ZERO FABRICATION (ANTI-HALUSINASI):
+   - JANGAN PERNAH MENGARANG DATA PALSU YANG SAMA SEKALI TIDAK ADA DI CV TEKS.
+   - Jika database sertifikasi, IPK, proyek, atau pengalaman tidak tertulis secara implisit atau eksplisit di CV asli, biarkan array-nya KOSONG ([] atau "").
+   - JAWABLAH DENGAN JUJUR. Jangan menambahkan pengalaman kerja fiktif, IPK bohongan (misal mengarang IPK 3.8), atau prestasi palsu.
+
+6. VALIDATION AND OVERALL STATUS:
+   - Lakukan pengecekan validitas struktur data yang berhasil di-parse:
+     * is_education_valid: bernilai true jika berhasil menemukan minimal 1 riwayat pendidikan formal (melalui heading atau fallback detection).
+     * is_experience_valid: bernilai true jika berhasil menemukan minimal 1 riwayat pengalaman kerja/organisasi.
+     * is_skills_valid: bernilai true jika terdapat keahlian/skills yang diekstrak.
+     * missing_sections: daftarkan array yang kosong dari bagian primer seperti: "Pendidikan", "Pengalaman", "Keahlian".
+     * overall_status: "VALID" jika bagian pendidikan dan pengalaman/organisasi terdeteksi cukup (tidak kosong). Jika kosong, berikan status "INVALID_MISSING_DATA".
+     * validation_message: berikan pesan feedback bahasa Indonesia yang sopan dan tajam. Jika ada bagian yang kosong, mintalah user dengan sopan untuk melengkapinya secara manual pada kolom review atau memeriksa format CV-nya.
+
+Tulis respon JSON terstruktur secara tuntas dan formal.`;
+
+    const prompt = `Berikut adalah data teks CV kasar Pengguna untuk di-ekstrak secara semantik dan diverifikasi:
+=== DESKRIPSI DATA CV KASAR ===
+${cvText}
+================================
+
+Sila lakukan parsing, deteksi fallback pendidikan, serta validasi data.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            candidate_name: {
+              type: Type.STRING,
+              description: "Nama kandidat yang ditemukan secara literal di baris atas CV. Jangan mengarang."
+            },
+            candidate_socials: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar email, nomor telepon, portfolio, github atau linkedin yang tertera di teks CV."
+            },
+            education: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  institution: { type: Type.STRING, description: "Nama universitas, sekolah, institut, boot camp akademis." },
+                  degree: { type: Type.STRING, description: "Derajat kelulusan (S1, S2, D3, SMK, SMA, Bachelor, Diploma, dsb) hasil analisis fallback." },
+                  major: { type: Type.STRING, description: "Jurusan, program studi, atau konsentrasi spesifik sekolah." },
+                  period: { type: Type.STRING, description: "Tahun / jangka waktu studi." },
+                  gpa: { type: Type.STRING, description: "IPK atau GPA asli jika dicantumkan di CV. Jangan membuat nilai palsu!" },
+                  activities: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Kegiatan organisasi, mata kuliah relevan, kualifikasi akademik." }
+                },
+                required: ["institution", "major"]
+              }
+            },
+            experience: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  company: { type: Type.STRING, description: "Nama perusahaan, instansi, BEM, kepanitiaan, magang." },
+                  role: { type: Type.STRING, description: "Jabatan atau jenis peran kerja." },
+                  period: { type: Type.STRING, description: "Masa/periode kerja." },
+                  tools: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Stack teknologi, peralatan, software, atau frameworks yang dipakai." },
+                  highlights: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Deskripsi tanggung jawab, kontribusi nyata, pencapaian." }
+                },
+                required: ["company", "role"]
+              }
+            },
+            skills: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Kumpulan list kata kunci keahlian teknis (programming language, tools, metodologi, soft skills) yang berhasil dipetakan dari CV."
+            },
+            projects: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar proyek mandiri, komersial, open source yang dicantumkan asli di CV."
+            },
+            certifications: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar sertifikat kompetensi asli."
+            },
+            achievements: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Daftar award, prestasi, kejuaraan, atau pencapaian kompetitif."
+            },
+            validation: {
+              type: Type.OBJECT,
+              properties: {
+                is_education_valid: { type: Type.BOOLEAN },
+                is_experience_valid: { type: Type.BOOLEAN },
+                is_skills_valid: { type: Type.BOOLEAN },
+                missing_sections: { type: Type.ARRAY, items: { type: Type.STRING } },
+                overall_status: { type: Type.STRING, description: "Status validitas parsing: 'VALID' atau 'INVALID_MISSING_DATA'" },
+                validation_message: { type: Type.STRING }
+              },
+              required: ["is_education_valid", "is_experience_valid", "is_skills_valid", "missing_sections", "overall_status", "validation_message"]
+            },
+            confidence: {
+              type: Type.OBJECT,
+              properties: {
+                level: { type: Type.STRING },
+                score: { type: Type.INTEGER },
+                remarks: { type: Type.STRING }
+              },
+              required: ["level", "score", "remarks"]
+            }
+          },
+          required: [
+            "candidate_name",
+            "candidate_socials",
+            "education",
+            "experience",
+            "skills",
+            "projects",
+            "certifications",
+            "achievements",
+            "validation",
+            "confidence"
+          ]
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) {
+      throw new Error("Received empty response from Parser AI.");
+    }
+
+    res.json(JSON.parse(resultText));
+  } catch (error: any) {
+    console.error("Parse CV CV error:", error);
+    res.status(500).json({ error: error.message || "Gagal mengekstrak data semantik CV." });
+  }
+});
+
+// B. Endpoint for running ATS Matcher and Optimizer based STRICTLY on validated parsed data
+app.post("/api/optimize-cv", async (req, res) => {
+  try {
+    const { parsedData, jobDescription } = req.body;
+
+    if (!parsedData) {
+      res.status(400).json({ error: "Data parsed CV yang tervalidasi wajib disertakan." });
+      return;
+    }
+    if (!jobDescription || !jobDescription.trim()) {
+      res.status(400).json({ error: "Deskripsi pekerjaan target (Job Description) wajib diisi." });
+      return;
+    }
+
+    const ai = getGeminiClient();
+
+    const systemInstruction = `Kamu adalah HRD Senior Tech Recruiter, ATS Optimizer, dan Konsultan Karier di CareerElevate AI.
+Tugas utamamu adalah memetakan dan mengoptimalkan penulisan CV serta merumuskan rekomendasi profil LinkedIn berdasarkan data CV terstruktur asli yang dikirimkan pengguna.
+
+BERIKUT ADALAH PRINSIP DAN RESTRICKSI KETAT PENGOPTIMALAN:
+
+1. DILARANG KERAS MENGARANG DATA PALSU (FAITHFUL OPTIMIZER):
+   - Kamu hanya boleh bekerja dengan data terstruktur asli (Pendidikan, Pengalaman, Sertifikasi, Proyek, Prestasi, Keahlian) yang dikirimkan oleh pengguna dalam objek 'parsedData'.
+   - JANGAN PERNAH MENAMBAHKAN pengalaman kerja baru di perusahaan fiktif, sertifikat bergengsi palsu (misal AWS Cloud Practitioner jika tidak ada di CV), IPK palsu (jika asli tidak dicantumkan, jangan diisi, atau jelaskan apa adanya), proyek imajiner, atau peran baru lainnya.
+   - Jika CV hanya memiliki sedikit data (data minim), berikan penilaian jujur, andalkan data asli tersebut, dan berikan panduan konkret serta rekomendasi perbaikan agar pengguna melengkapinya di draf mereka, daripada kamu mengarang data fiktif baru.
+
+2. PENYELARASAN OUTPUT:
+   - Output optimasi harus 100% konsisten dan sinkron dengan CV asli kandidat.
+   - Jika CV memiliki riwayat pendidikan, draf optimasi akademis wajib menampilkan institusi dan jurusan asli yang sama.
+   - Jika CV memiliki riwayat pengalaman kerja, ulasan XYZ formula wajib merefleksikan peran di instansi kerja aslinya.
+   - Jika CV memiliki skill, polislah list skill secara teratur tanpa menambahkan teknologi acak berisiko tinggi yang tidak dikuasai.
+
+3. STRUKTUR CV IMPROVEMENTS (XYZ FORMULA):
+   - Buatlah 3-5 ulasan perbaikan (improvements) kalimat asli dari riwayat kerja, proyek, atau pendidikan kandidat.
+   - Kolom "before" wajib diisi kalimat rujukan asli dari parsedData.
+   - Kolom "after" dipoles menggunakan XYZ Formula (Accomplished [X] as measured by [Y], by doing [Z]). Tambahkan peningkatan persentase efisiensi, durasi, kecepatan atau volume performa secara logis dan masuk akal untuk memperindah tata bahasa, sepanjang substansi pekerjaannya tetap setia pada riwayat aslinya.
+   - Sediakan argumentasi ilmiah mengapa revisi di "after" lebih disukai sistem ATS rekruter pada kolom "reason".
+
+4. OPTIMASI LINKEDIN YANG INTEGRATIF:
+   - Rekomendasikan headline, summary (kisah About Me berkategori profesional modern Indonesia/Jakarta style yang asyik tapi formal), serta draf experience dan education yang ditarik dari data parsedData yang sah saja.
+
+Tanggapi dalam bentuk format JSON rapi sesuai schema yang didefinisikan secara tuntas dalam bahasa Indonesia yang berwibawa, tajam, objektif dan profesional.`;
+
+    const prompt = `Berikut adalah data CV terstruktur pengguna hasil verifikasi parsing semantik:
+=== DATA PARSED CV TERVALIDASI ===
+${JSON.stringify(parsedData, null, 2)}
+===================================
+
+Berikut adalah Kriteria Karir Pekerjaan Target (Job Description):
+=== JOB DESCRIPTION ===
+${jobDescription}
+=======================
+
+Tolong buat kalkulasi ATS Score yang jujur, analisis keyword gapped, ulasan rewrite XYZ CV manual (improvements), serta optimasi profil LinkedIn yang rapi berdasarkan riwayat asli di atas.`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            cv_analysis: {
+              type: Type.OBJECT,
+              properties: {
+                ats_score: {
+                  type: Type.INTEGER,
+                  description: "ATS matching score dari 0 - 100 berdasarkan kesesuaian data CV asli dengan JD target."
+                },
+                candidate_name: {
+                  type: Type.STRING,
+                  description: "Nama kandidat dari parsedData."
+                },
+                candidate_socials: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                target_optimizations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Aspek konkrit yang butuh dioptimalkan berdasarkan data asli pengguna yang minim."
+                },
+                keyword_gap: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Teknologi/metrik penting dari lowongan yang belum dicantumkan di CV asli."
+                },
+                improvements: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      section: { type: Type.STRING, description: "Judul seksi, cth: 'Pengalaman Kerja', 'Portofolio Proyek', 'Pendidikan'." },
+                      main_issue: { type: Type.STRING, description: "Kelemahan deskripsi awal." },
+                      before: { type: Type.STRING, description: "Deskripsi asli kandidat sesuai data parser." },
+                      after: { type: Type.STRING, description: "Deskripsi yang teroptimasi dengan XYZ formula (memakai metrik angka masuk akal) berbasis peran asli." },
+                      reason: { type: Type.STRING, description: "Argumen mengapa kalimat baru ini jauh lebih persuasif bagi rekruter hrd." }
+                    },
+                    required: ["section", "main_issue", "before", "after", "reason"]
+                  }
+                }
+              },
+              required: ["ats_score", "candidate_name", "candidate_socials", "target_optimizations", "keyword_gap", "improvements"]
+            },
+            linkedin_optimization: {
+              type: Type.OBJECT,
+              properties: {
+                headline_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "3 draf headline LinkedIn CTR tinggi, berbasis murni pada kualifikasi riil parsedData."
+                },
+                summary_before_snippet: {
+                  type: Type.STRING,
+                  description: "Snippet analisis kelemahan ringkasan profil lama."
+                },
+                summary_after: {
+                  type: Type.STRING,
+                  description: "Komposisi naratif About Me LinkedIn yang komprehensif, bercerita, profesional, berbasis 100% pada rincian data asli, dengan call-to-action draf."
+                },
+                summary_improvement_notes: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING }
+                },
+                experience_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Usulan penulisan bagian pengalaman kerja di LinkedIn."
+                },
+                education_recommendations: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Usulan penulisan pendidikan di LinkedIn."
+                }
+              },
+              required: ["headline_recommendations", "summary_before_snippet", "summary_after", "summary_improvement_notes", "experience_recommendations", "education_recommendations"]
+            }
+          },
+          required: ["cv_analysis", "linkedin_optimization"]
+        }
+      }
+    });
+
+    const resultText = response.text;
+    if (!resultText) {
+      throw new Error("Received empty response from Optimizer AI.");
+    }
+
+    res.json(JSON.parse(resultText));
+  } catch (error: any) {
+    console.error("Optimize CV route error:", error);
+    res.status(500).json({ error: error.message || "Gagal menjalankan optimasi data CV setia fakta." });
+  }
+});
+
 // 2. Extra endpoint for LinkedIn Profile Optimization
 app.post("/api/optimize-linkedin", async (req, res) => {
   try {
