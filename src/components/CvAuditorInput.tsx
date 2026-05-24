@@ -256,22 +256,7 @@ export default function CvAuditorInput({
           </div>
         )}
 
-        {/* Calibrated description box */}
-        <div className="p-4 bg-[#030712]/40 rounded-xl border border-white/[0.04] space-y-1.5 text-xs text-zinc-400">
-          <div className="flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider">
-            <span>PARAMETER RELEVANSI LOWONGAN:</span>
-            <span className="text-white">
-              {selectedJobId === "custom" 
-                ? (customJobTitle.trim() || "Kunci Posisi Kustom") 
-                : PREDEFINED_JOBS.find(j => j.id === selectedJobId)?.title}
-            </span>
-          </div>
-          <p className="text-[11px] leading-relaxed font-sans text-zinc-400">
-            {selectedJobId === "custom" 
-              ? `Penilaian kesesuaian modul dan parsing data personal akan dioptimalkan sejalan dengan tren kriteria ${customJobTitle.trim() || "'Kustom'"} versi rekrutir terbaru.`
-              : PREDEFINED_JOBS.find(j => j.id === selectedJobId)?.description}
-          </p>
-        </div>
+
       </div>
 
       <button

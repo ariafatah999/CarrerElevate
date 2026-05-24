@@ -178,48 +178,7 @@ export default function LinkedinInput({
           </div>
         </div>
 
-        {/* Manual Fallbacks Fields */}
-        {!linkedinPdfFileName && (
-          <div className="border border-white/[0.04] rounded-xl p-4.5 bg-[#030712]/40">
-            <details className="group">
-              <summary className="text-xs font-semibold text-zinc-400 hover:text-zinc-200 cursor-pointer flex justify-between items-center select-none">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">Atau masukkan draf isian LinkedIn Anda secara manual</span>
-                <ChevronDown className="w-3.5 h-3.5 text-zinc-500 group-open:rotate-180 transition-transform" />
-              </summary>
-              <div className="mt-4 pt-4 border-t border-white/[0.03] space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Headline */}
-                  <div className="space-y-2">
-                    <label htmlFor="linkedin-headline-input" className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
-                      Headline Saat Ini / Lama Anda
-                    </label>
-                    <textarea
-                      id="linkedin-headline-input"
-                      value={linkedinHeadlineLama}
-                      onChange={(e) => setLinkedinHeadlineLama(e.target.value)}
-                      placeholder="Contoh: Freshgraduate IT S1 Universitas Hasanuddin | Antusias membuat rancangan Web UI/UX"
-                      className="w-full h-24 bg-[#030712] text-white p-3 rounded-lg border border-white/[0.04] focus:outline-none focus:border-white text-xs font-mono resize-none leading-relaxed"
-                    />
-                  </div>
 
-                  {/* Summary */}
-                  <div className="space-y-2">
-                    <label htmlFor="linkedin-summary-input" className="text-[10px] font-mono font-bold uppercase tracking-widest text-zinc-400 block">
-                      Rangkuman Diri / About Lama Anda
-                    </label>
-                    <textarea
-                      id="linkedin-summary-input"
-                      value={linkedinSummaryLama}
-                      onChange={(e) => setLinkedinSummaryLama(e.target.value)}
-                      placeholder="Contoh: Saya adalah junior developer yang pandai bersosialisasi dan berminat melamar magang..."
-                      className="w-full h-24 bg-[#030712] text-white p-3 rounded-lg border border-white/[0.04] focus:outline-none focus:border-white text-xs font-mono resize-none leading-relaxed"
-                    />
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-        )}
 
         {/* Target Position */}
         <div className="space-y-2">

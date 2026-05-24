@@ -17,30 +17,7 @@ import {
   Globe,
   Tag
 } from "lucide-react";
-
-export interface ParsedLinkedinResultData {
-  current_headline: string;
-  about_summary: string;
-  experience: Array<{
-    company: string;
-    role: string;
-    period: string;
-    tools: string[];
-    highlights: string[];
-  }>;
-  education: Array<{
-    institution: string;
-    major: string;
-    period: string;
-    gpa?: string;
-    activities?: string[];
-  }>;
-  skills: string[];
-  certifications: string[];
-  projects: string[];
-  achievements: string[];
-  keywords: string[];
-}
+import { ParsedLinkedinResultData } from "../types";
 
 interface LinkedinValidationScreenProps {
   parsedData: ParsedLinkedinResultData;

@@ -1,20 +1,16 @@
 import React from "react";
-import { History, Trash2 } from "lucide-react";
-import { AnalysisResponse, AnalysisHistoryItem } from "../types";
+import { History, Trash2, Linkedin, FileText, CheckCircle } from "lucide-react";
+import { AnalysisHistoryItem } from "../types";
 
 interface HistoryTabProps {
   history: AnalysisHistoryItem[];
-  setActiveTab: (tab: "cv-auditor" | "linkedin" | "history") => void;
-  setActiveAnalysis: React.Dispatch<React.SetStateAction<AnalysisResponse | null>>;
-  setActiveAnalysisMetadata: (meta: { jobTitle: string; companyName: string } | null) => void;
+  onLoadHistoryItem: (item: AnalysisHistoryItem) => void;
   deleteHistoryItem: (id: string, e: React.MouseEvent) => void;
 }
 
 export default function HistoryTab({
   history,
-  setActiveTab,
-  setActiveAnalysis,
-  setActiveAnalysisMetadata,
+  onLoadHistoryItem,
   deleteHistoryItem
 }: HistoryTabProps) {
   const getScoreBgColor = (score: number) => {
@@ -36,57 +32,68 @@ export default function HistoryTab({
         <div className="bg-[#1F293D] p-12 rounded-2xl border border-slate-800 text-center flex flex-col items-center shadow-md">
           <History className="w-12 h-12 text-slate-600 mb-4 animate-pulse" />
           <p className="text-slate-400 text-sm font-sans">Belum ada riwayat audit tersimpan.</p>
-          <p className="text-xs text-slate-500 mt-1 font-sans">Lakukan audit pada tab "CV ATS Auditor" untuk mulai menyimpan data.</p>
-          <button
-            onClick={() => setActiveTab("cv-auditor")}
-            className="mt-4 px-4 py-2 bg-gradient-to-r from-cyan-500 to-indigo-600 rounded-xl text-xs font-bold text-white hover:scale-105 transition-all cursor-pointer"
-          >
-            Mulai Audit Pertama Anda
-          </button>
+          <p className="text-xs text-slate-500 mt-1 font-sans">Lakukan evaluasi pada tab "CV ATS Auditor" atau "LinkedIn Optimizer" untuk mulai menyimpan data.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4">
-          {history.map((item) => (
-            <div
-              key={item.id}
-              onClick={() => {
-                setActiveAnalysis(item.data);
-                setActiveAnalysisMetadata({ jobTitle: item.jobTitle, companyName: item.companyName });
-                setActiveTab("cv-auditor");
-              }}
-              className="bg-[#1F293D] p-5 rounded-xl border border-slate-800 hover:border-cyan-500/20 transition-all flex items-center justify-between gap-4 cursor-pointer hover:bg-[#1F293D]/80 group shadow-md animate-fade-in"
-            >
-              <div className="space-y-1 min-w-0">
-                <div className="text-[10px] font-mono text-slate-500 flex items-center gap-2">
-                  <span>{item.timestamp}</span>
-                  <span className="text-slate-700">•</span>
-                  <span className="text-slate-400 font-sans">Kandidat Web Developer</span>
-                </div>
-                <h4 className="font-bold text-sm text-slate-200 truncate pr-2 group-hover:text-cyan-400 transition-colors">
-                  {item.jobTitle}
-                </h4>
-                <p className="text-xs text-slate-400 truncate">
-                  Perusahaan: {item.companyName}
-                </p>
-              </div>
+          {history.map((item) => {
+            const isLinkedin = item.type === "linkedin";
 
-              <div className="flex items-center gap-5 shrink-0">
-                {/* Static pill score */}
-                <div className={`px-3 py-1.5 rounded-lg border font-mono text-xs font-bold ${getScoreBgColor(item.ats_score)}`}>
-                  ATS: {item.ats_score}%
+            return (
+              <div
+                key={item.id}
+                onClick={() => onLoadHistoryItem(item)}
+                className="bg-[#1F293D] p-5 rounded-xl border border-slate-800 hover:border-cyan-500/20 transition-all flex items-center justify-between gap-4 cursor-pointer hover:bg-[#1F293D]/80 group shadow-md animate-fade-in"
+              >
+                <div className="space-y-2 min-w-0 flex-1">
+                  <div className="text-[10px] font-mono text-slate-500 flex flex-wrap items-center gap-2">
+                    <span className="text-zinc-400">{item.timestamp}</span>
+                    <span className="text-slate-700">•</span>
+                    {isLinkedin ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">
+                        <Linkedin className="w-2.5 h-2.5 shrink-0" /> LINKEDIN OPTIMIZATION
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
+                        <FileText className="w-2.5 h-2.5 shrink-0" /> CV ATS AUDIT
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-200 truncate pr-2 group-hover:text-cyan-400 transition-colors">
+                      {item.jobTitle}
+                    </h4>
+                    <p className="text-xs text-slate-405 font-mono mt-0.5">
+                      {isLinkedin ? "Sumber: Dokumen LinkedIn" : `Target Perusahaan: ${item.companyName}`}
+                    </p>
+                  </div>
                 </div>
 
-                {/* Action delete btn */}
-                <button
-                  onClick={(e) => deleteHistoryItem(item.id, e)}
-                  className="p-2 border border-slate-800 text-slate-400 hover:text-red-400 rounded-lg hover:border-red-500/20 cursor-pointer transition-colors"
-                  title="Hapus Catatan"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-5 shrink-0">
+                  {/* Status or Score display */}
+                  {isLinkedin ? (
+                    <div className="px-3 py-1.5 rounded-lg border border-[#06b6d4]/20 bg-[#06b6d4]/10 font-mono text-[10px] font-bold text-cyan-400 flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5 shrink-0" /> OPTIMAL
+                    </div>
+                  ) : (
+                    <div className={`px-3 py-1.5 rounded-lg border font-mono text-xs font-bold ${getScoreBgColor(item.ats_score)}`}>
+                      ATS: {item.ats_score}%
+                    </div>
+                  )}
+
+                  {/* Action delete btn */}
+                  <button
+                    onClick={(e) => deleteHistoryItem(item.id, e)}
+                    className="p-2 border border-slate-800 text-slate-400 hover:text-red-400 rounded-lg hover:border-red-500/20 cursor-pointer transition-colors"
+                    title="Hapus Catatan"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

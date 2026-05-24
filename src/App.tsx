@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { EXAMPLES } from "./data/examples";
-import { AnalysisResponse, AnalysisHistoryItem } from "./types";
+import { AnalysisResponse, AnalysisHistoryItem, ParsedLinkedinResultData } from "./types";
 import { PREDEFINED_JOBS } from "./data/jobs";
 import { ParsedCvResultData } from "./components/CvValidationScreen";
-import { ParsedLinkedinResultData } from "./components/LinkedinValidationScreen";
 
 // Modular Sub-Components
 import Sidebar from "./components/Sidebar";
@@ -150,8 +149,10 @@ export default function App() {
         }),
         jobTitle,
         companyName,
-        ats_score: data.cv_analysis.ats_score,
-        data
+        ats_score: data.cv_analysis?.ats_score || 80,
+        data,
+        type: "cv",
+        selectedJobId
       };
 
       const updatedHistory = [newItem, ...history];
@@ -160,6 +161,63 @@ export default function App() {
       setActiveAnalysisMetadata({ jobTitle, companyName });
     } catch (e) {
       console.error("Failed to save item to history", e);
+    }
+  };
+
+  // Save LinkedIn history helper
+  const saveLinkedinToHistory = (data: AnalysisResponse, parsedResult: ParsedLinkedinResultData) => {
+    try {
+      const jobTitle = linkedinTargetRole.trim() || "Spesialis LinkedIn";
+      const companyName = "Profil LinkedIn";
+
+      const newItem: AnalysisHistoryItem = {
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit"
+        }),
+        jobTitle,
+        companyName,
+        ats_score: 100,
+        data,
+        type: "linkedin",
+        parsedLinkedinResult: parsedResult,
+        linkedinTone: linkedinTone
+      };
+
+      const updatedHistory = [newItem, ...history];
+      setHistory(updatedHistory);
+      localStorage.setItem("career_elevate_history", JSON.stringify(updatedHistory));
+    } catch (e) {
+      console.error("Failed to save LinkedIn to history", e);
+    }
+  };
+
+  // Unified history item loader
+  const handleLoadHistoryItem = (item: AnalysisHistoryItem) => {
+    setActiveAnalysis(item.data);
+    setActiveAnalysisMetadata({ jobTitle: item.jobTitle, companyName: item.companyName });
+
+    if (item.type === "linkedin") {
+      setLinkedinTargetRole(item.jobTitle);
+      if (item.parsedLinkedinResult) {
+        setParsedLinkedinResult(item.parsedLinkedinResult);
+      }
+      if (item.linkedinTone) {
+        setLinkedinTone(item.linkedinTone);
+      }
+      setLinkedinParsingStage("results");
+      setActiveTab("linkedin");
+    } else {
+      // It's a CV audit item
+      if (item.selectedJobId) {
+        setSelectedJobId(item.selectedJobId);
+      }
+      setParsingStage("results");
+      setActiveTab("cv-auditor");
     }
   };
 
@@ -463,8 +521,8 @@ export default function App() {
 
   // Step 1/2/3: Parse & Extract Semantic LinkedIn Profile information
   const triggerLinkedinParser = async () => {
-    if (!linkedinProfileText.trim() && !linkedinHeadlineLama.trim() && !linkedinSummaryLama.trim()) {
-      setLinkedinErrorMessage("Silakan unggah dokumen PDF LinkedIn Anda atau isi kolom manual.");
+    if (!linkedinProfileText.trim()) {
+      setLinkedinErrorMessage("Silakan unggah dokumen PDF LinkedIn Anda atau pilih tombol '⚡ Coba Sample LinkedIn' terlebih dahulu.");
       return;
     }
     setLinkedinErrorMessage(null);
@@ -525,29 +583,30 @@ export default function App() {
 
       const result = await response.json();
 
-      // Update active analysis with the newly returned LinkedIn optimizations
-      setActiveAnalysis((prev) => {
-        const fallbackCv = prev?.cv_analysis || {
-          ats_score: 85,
-          keyword_gap: payload.skills.slice(0, 4),
-          improvements: [
-            {
-              section: "Pengalaman & Profil Utama",
-              main_issue: "Headline lama kurang merepresentasikan kekuatan teknis.",
-              before: payload.current_headline,
-              after: result.headline_recommendations[0],
-              reason: "Persona profesional berbasis SEO dan CTR modern."
-            }
-          ]
-        };
-        return {
-          cv_analysis: fallbackCv,
-          linkedin_optimization: result
-        };
-      });
+      const fallbackCv = activeAnalysis?.cv_analysis || {
+        ats_score: 85,
+        keyword_gap: payload.skills.slice(0, 4),
+        improvements: [
+          {
+            section: "Pengalaman & Profil Utama",
+            main_issue: "Headline lama kurang merepresentasikan kekuatan teknis.",
+            before: payload.current_headline,
+            after: result.headline_recommendations[0],
+            reason: "Persona profesional berbasis SEO dan CTR modern."
+          }
+        ]
+      };
 
+      const updatedCtx: AnalysisResponse = {
+        cv_analysis: fallbackCv,
+        linkedin_optimization: result
+      };
+
+      setActiveAnalysis(updatedCtx);
       setActiveAnalysisMetadata({ jobTitle: linkedinTargetRole, companyName: "LinkedIn Optimizer" });
       setLinkedinParsingStage("results");
+
+      saveLinkedinToHistory(updatedCtx, payload);
     } catch (err: any) {
       console.error(err);
       setLinkedinErrorMessage(err.message || "Gagal menghubungi server untuk optimasi akhir LinkedIn.");
@@ -694,9 +753,7 @@ export default function App() {
                 element={
                   <HistoryPage
                     history={history}
-                    setActiveTab={setActiveTab}
-                    setActiveAnalysis={handleSetActiveAnalysis}
-                    setActiveAnalysisMetadata={setActiveAnalysisMetadata}
+                    onLoadHistoryItem={handleLoadHistoryItem}
                     deleteHistoryItem={deleteHistoryItem}
                   />
                 }

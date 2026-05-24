@@ -14,8 +14,7 @@ import {
   User,
   FileText
 } from "lucide-react";
-import { AnalysisResponse } from "../types";
-import { ParsedLinkedinResultData } from "./LinkedinValidationScreen";
+import { AnalysisResponse, ParsedLinkedinResultData } from "../types";
 
 interface LinkedinResultsProps {
   activeAnalysis: AnalysisResponse;

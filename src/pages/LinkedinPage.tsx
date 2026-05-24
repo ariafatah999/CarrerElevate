@@ -1,8 +1,8 @@
 import React from "react";
 import LinkedinInput from "../components/LinkedinInput";
 import LinkedinResults from "../components/LinkedinResults";
-import LinkedinValidationScreen, { ParsedLinkedinResultData } from "../components/LinkedinValidationScreen";
-import { AnalysisResponse } from "../types";
+import LinkedinValidationScreen from "../components/LinkedinValidationScreen";
+import { AnalysisResponse, ParsedLinkedinResultData } from "../types";
 
 interface LinkedinPageProps {
   linkedinLoading: boolean;

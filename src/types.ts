@@ -73,6 +73,30 @@ export interface LinkedinOptimization {
   achievements_recommendations?: string[];
 }
 
+export interface ParsedLinkedinResultData {
+  current_headline: string;
+  about_summary: string;
+  experience: Array<{
+    company: string;
+    role: string;
+    period: string;
+    tools: string[];
+    highlights: string[];
+  }>;
+  education: Array<{
+    institution: string;
+    major: string;
+    period: string;
+    gpa?: string;
+    activities?: string[];
+  }>;
+  skills: string[];
+  certifications: string[];
+  projects: string[];
+  achievements: string[];
+  keywords: string[];
+}
+
 export interface AnalysisResponse {
   cv_analysis: CvAnalysis;
   linkedin_optimization: LinkedinOptimization;
@@ -85,4 +109,8 @@ export interface AnalysisHistoryItem {
   companyName: string;
   ats_score: number;
   data: AnalysisResponse;
+  type?: "cv" | "linkedin";
+  parsedLinkedinResult?: ParsedLinkedinResultData;
+  linkedinTone?: string;
+  selectedJobId?: string;
 }
