@@ -3,7 +3,8 @@ import path from "path";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import multer from "multer";
-import { PDFParse } from "pdf-parse";
+// @ts-ignore
+import pdf from "pdf-parse";
 
 dotenv.config();
 
@@ -365,9 +366,8 @@ app.post("/api/parse-pdf", upload.single("pdf"), async (req, res) => {
     }
 
     const dataBuffer = req.file.buffer;
-    // Instantiate PDFParse helper and extract text
-    const pdfParser = new PDFParse({ data: dataBuffer });
-    const parsedData = await pdfParser.getText();
+    // Extract text using pdf-parse library
+    const parsedData = await pdf(dataBuffer);
     const extractedText = parsedData.text || "";
 
     if (!extractedText.trim()) {
@@ -413,4 +413,8 @@ async function init() {
   });
 }
 
-init();
+if (process.env.VERCEL !== "1") {
+  init();
+}
+
+export default app;
